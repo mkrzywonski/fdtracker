@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="mb-4">Edit Batch #{{ '%08d' % batch.id }}</h1>
+
+<!-- Batch Details Card -->
+<div class="card border border-dark mb-4">
+    <div class="card-header bg-primary text-white">
+        Batch Details
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('edit_batch', id=batch.id) }}">
+            <div class="mb-3">
+                <label for="batch_notes" class="form-label">Batch Notes</label>
+                <textarea class="form-control" id="batch_notes" name="batch_notes" rows="3">{{ batch.notes }}</textarea>
+            </div>
+            <div class="mb-3">
+                <label for="start_date" class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="start_date" name="start_date"
+                    value="{{ batch.start_date.strftime('%Y-%m-%d') }}">
+            </div>
+            <div class="mb-3">
+                <label for="end_date" class="form-label">End Date</label>
+                <input type="date" class="form-control" id="end_date" name="end_date"
+                    value="{{ batch.end_date.strftime('%Y-%m-%d') if batch.end_date else '' }}">
+            </div>
+
+    </div>
+</div>
+
+<!-- Trays Card -->
+<div class="card border border-dark mb-4">
+    <div class="card-header bg-primary text-white">
+        Trays
+    </div>
+    <div class="card-body">
+        <ul class="list-group">
+            {% for tray in batch.trays %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Tray {{ tray.position }}: {{ tray.contents }}
+                <div>
+                    <label>
+                        <input type="checkbox" class="checkbox" name="delete_tray" value="{{ tray.id }}"> Delete
+                    </label>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<!-- Bags Card -->
+<div class="card border border-dark mb-4">
+    <div class="card-header bg-primary text-white">
+        Bags
+    </div>
+    <div class="card-body">
+        <ul class="list-group">
+            {% for bag in batch.bags %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Bag {{ bag.id }}: {{ bag.contents }}
+                <div>
+                    <label>
+                        <input type="checkbox" class="checkbox" name="delete_bag" value="{{ bag.id }}"> Delete
+                    </label>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+<button type="submit" class="btn btn-primary">Save Changes</button>
+<a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+</form>
+
+<form method="POST" action="{{ url_for('delete_batch', id=batch.id) }}"
+    onsubmit="return confirm('Are you sure you want to delete this batch? This action cannot be undone.');">
+    <br><button type="submit" class="btn btn-danger">Delete Batch</button>
+</form>
+{% endblock %}

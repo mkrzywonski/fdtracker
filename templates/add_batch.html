@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="form-title text-center">Add New Batch</div>
+<form method="POST">
+    <div class="mb-3">
+        <label class="form-label">Number of Trays</label>
+        <select name="tray_count" class="form-control" id="trayCount">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+        </select>
+    </div>
+    <div id="trayContainer">
+        <!-- Tray forms will be dynamically added here -->
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Batch Notes</label>
+        <textarea name="batch_notes" class="form-control" rows="3"></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Start Batch</button>
+</form>
+
+<script>
+document.getElementById('trayCount').addEventListener('change', function() {
+    const container = document.getElementById('trayContainer');
+    container.innerHTML = '';
+    const count = parseInt(this.value);
+    
+    for (let i = 0; i < count; i++) {
+        container.innerHTML += `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h2 class="card-title">Tray ${i + 1}</h2>
+                    <div class="mb-3">
+                        <label class="form-label">Contents</label>
+                        <input type="text" name="contents_${i}" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Initial Weight (g)</label>
+                        <input type="number" step="0.01" name="starting_weight_${i}" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes_${i}" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+});
+
+// Trigger initial tray form
+document.getElementById('trayCount').dispatchEvent(new Event('change'));
+</script>
+{% endblock %}
