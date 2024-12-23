@@ -5,6 +5,7 @@ from io import BytesIO
 import qrcode
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 from markupsafe import Markup
 import re
 
@@ -214,13 +215,41 @@ def print_label(id):
 
     # Create PDF in memory
     buffer = BytesIO()
+
+    # Page setup
+    from reportlab.platypus import Frame, PageTemplate
+    from reportlab.lib.pagesizes import inch
+
+    PAGE_WIDTH, PAGE_HEIGHT = 4 * inch, 6 * inch
+    MARGIN = 0.25 * inch
+
+    # Function to draw footer (QR code and URL) on every page
+    def draw_footer(canvas, doc):
+        qr_img = RLImage(qr_buffer, width=1.5 * inch, height=1.5 * inch)
+        qr_x = (PAGE_WIDTH - qr_img.drawWidth) / 2
+        qr_y = 0.5 * inch
+        qr_img.drawOn(canvas, qr_x, qr_y)
+
+        url_style = ParagraphStyle(
+            'URL',
+            fontSize=8,
+            alignment=1  # Center alignment
+        )
+        url_paragraph = Paragraph(batch_url, url_style)
+        url_width, url_height = url_paragraph.wrap(PAGE_WIDTH - 2 * MARGIN, 0)
+        url_x = (PAGE_WIDTH - url_width) / 2
+        canvas.saveState()
+        url_paragraph.drawOn(canvas, url_x, qr_y - url_height - 10)  # Position below QR code
+        canvas.restoreState()
+
+    # Set up the document
     doc = SimpleDocTemplate(
         buffer,
-        pagesize=(4 * inch, 6 * inch),
-        rightMargin=0.25*inch,
-        leftMargin=0.25*inch,
-        topMargin=0.25*inch,
-        bottomMargin=0.25*inch
+        pagesize=(PAGE_WIDTH, PAGE_HEIGHT),
+        rightMargin=MARGIN,
+        leftMargin=MARGIN,
+        topMargin=MARGIN,  # Leave space at the bottom for the footer
+        bottomMargin=2 * inch  # QR code and URL will fit here
     )
 
     # Create styles
@@ -249,19 +278,17 @@ def print_label(id):
     if bag.notes:
         elements.append(Paragraph(f"Notes: {bag.notes}", normal_style))
 
-    # Add QR code
-    qr_img = RLImage(qr_buffer, width=1.5*inch, height=1.5*inch)
-    elements.append(qr_img)
-    
-    # Add URL in small text
-    url_style = ParagraphStyle(
-        'URL',
-        parent=styles['Normal'],
-        fontSize=8
+    # Set up a page template with the footer
+    doc.addPageTemplates(
+        PageTemplate(
+            frames=[
+                Frame(MARGIN, MARGIN, PAGE_WIDTH - 2 * MARGIN, PAGE_HEIGHT - 0.5 * inch)
+            ],
+            onPage=draw_footer  # Call the footer drawing function on every page
+        )
     )
-    elements.append(Paragraph(batch_url, url_style))
 
-    # Generate PDF
+    # Generate the PDF
     doc.build(elements)
     buffer.seek(0)
 
@@ -270,6 +297,7 @@ def print_label(id):
         download_name=f'bag_{bag.id}_label.pdf',
         mimetype='application/pdf'
     )
+
 
 @app.route('/edit_batch/<int:id>', methods=['GET', 'POST'])
 def edit_batch(id):
@@ -293,7 +321,7 @@ def edit_batch(id):
             db.session.delete(bag)
 
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('index', expanded_batch=batch.id))
 
     return render_template('edit_batch.html', batch=batch)
 
@@ -306,14 +334,14 @@ def edit_tray(id):
             batch_id = tray.batch_id
             db.session.delete(tray)
             db.session.commit()
-            return redirect(url_for('edit_batch', id=batch_id))
+            return redirect(url_for('index', id=batch_id))
         else:
             tray.contents = request.form['contents']
             tray.starting_weight = float(request.form['starting_weight']) if request.form['starting_weight'] else None
             tray.ending_weight = float(request.form['ending_weight']) if request.form['ending_weight'] else None
             tray.notes = request.form['notes']
             db.session.commit()
-            return redirect(url_for('edit_batch', id=tray.batch_id))
+            return redirect(url_for('index', expanded_batch=tray.batch_id))
     return render_template('edit_tray.html', tray=tray)
 
 @app.route('/edit_bag/<string:id>', methods=['GET', 'POST'])
@@ -338,7 +366,7 @@ def edit_bag(id):
             bag.consumed_date = datetime.strptime(consumed_date, '%Y-%m-%d') if consumed_date else None
 
             db.session.commit()
-            return redirect(url_for('edit_batch', id=bag.batch_id))
+            return redirect(url_for('index', expanded_batch=bag.batch_id))
     return render_template('edit_bag.html', bag=bag)
 
 @app.template_filter('highlight')
@@ -348,37 +376,66 @@ def highlight_search(text, search):
     escaped_search = re.escape(search)
     return Markup(re.sub(f"({escaped_search})", r"<mark>\1</mark>", text, flags=re.IGNORECASE))
 
-@app.route('/check_weight/<int:batch_id>', methods=['POST'])
-def check_weight(batch_id):
+@app.route('/update_weight/<int:batch_id>', methods=['POST'])
+def update_weight(batch_id):
     batch = Batch.query.get_or_404(batch_id)
-    all_weights_stable = True
-    weight_changes = []
 
     for tray in batch.trays:
         tray_id = str(tray.id)
-        entered_weight = float(request.form.get(f'ending_weight_{tray_id}', 0))
-        print(f"Entered weight for tray {tray_id}: {entered_weight}")
-        # Determine weight to compare with
-        comparison_weight = tray.previous_weight or tray.starting_weight
-        if not comparison_weight:
-            continue  # Skip if no valid weight to compare
+        # Retrieve the weight entered by the user from the form
+        entered_weight = request.form.get(f'ending_weight_{tray_id}')
+        if entered_weight:
+            # Save the entered weight as the tray's previous weight
+            tray.previous_weight = float(entered_weight)
 
-        # Calculate percentage difference
-        weight_difference = abs(entered_weight - comparison_weight) / comparison_weight * 100
-        if weight_difference > 2:
-            tray.previous_weight = entered_weight
-            all_weights_stable = False
-        weight_changes.append((tray.position, weight_difference))
-
+    # Commit the changes to the database
     db.session.commit()
 
-    if all_weights_stable:
-        # If all weights are stable, prompt confirmation to complete the batch
-        return render_template('confirm_complete.html', batch=batch, weight_changes=weight_changes)
-
+    # Redirect back to the batch details page with the batch expanded
     return redirect(url_for('index', expanded_batch=batch.id))
+
+@app.route('/view_bags')
+def view_bags():
+    page = request.args.get('page', 1, type=int)
+    search_query = request.args.get('search', '').strip()
+    expanded_bag = request.args.get('expanded_bag', type=str)
+
+    # Base query
+    query = Bag.query
+
+    # Apply search filter if a search query is provided
+    if search_query:
+        query = query.filter(
+            db.or_(
+                Bag.id.ilike(f"%{search_query}%"),
+                Bag.contents.ilike(f"%{search_query}%"),
+                Bag.notes.ilike(f"%{search_query}%"),
+            )
+        )
+
+    if expanded_bag:
+        # Get all batch IDs sorted by ID with most recent first
+        all_bags = query.order_by(Bag.id.desc()).all()
+        bag_ids = [bag.id for bag in all_bags]
+
+        # Determine the page where the expanded_batch resides
+        if expanded_bag in bag_ids:
+            bag_index = bag_ids.index(expanded_bag)
+            page = (bag_index // PER_PAGE) + 1  # Use PER_PAGE
+
+    # Paginate the filtered results
+    pagination = query.order_by(Bag.id.desc()).paginate(page=page, per_page=PER_PAGE)
+    bags = pagination.items
+
+    return render_template(
+        'bags.html',
+        bags=bags,
+        pagination=pagination,
+        expanded_bag=expanded_bag,
+        search_query=search_query
+    )
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    app.run(debug=True)

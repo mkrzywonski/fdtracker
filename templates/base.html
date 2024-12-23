@@ -71,6 +71,10 @@
             cursor: pointer;
             /* Optional: Adds a pointer cursor for better UX */
         }
+
+        .checkbox-label {
+            font-size: 2.2rem;
+        }
         mark {
             background-color: rgb(255, 242, 0);
             /* Custom background color */
@@ -81,26 +85,37 @@
 </head>
 
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-sm navbar-dark bg-dark">
         <div class="container-fluid">
+            <!-- Navbar brand aligned to the left -->
             <a class="navbar-brand" href="/">Freeze Dry Tracker</a>
-            <div class="navbar-nav">
-                <a class="nav-link" href="{{ url_for('add_batch') }}">Add New Batch</a>
+            
+            <!-- Toggler for smaller screens -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <!-- Navigation menu -->
+            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <ul class="navbar-nav flex-column align-items-end">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('add_batch') }}">New Batch</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">View Batches</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('view_bags') }}">View Bags</a>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
-    <div class="container-fluid mt-4">
-        <form class="d-flex" method="GET" action="{{ url_for('index') }}">
-            <input class="form-control me-2 border-primary" type="search" name="search" placeholder="Search..."
-                aria-label="Search" value="{{ search_query if search_query else '' }}">
-            <button class="btn btn-primary me-2" type="submit">Search</button>
-            <a href="{{ url_for('index') }}" class="btn btn-outline-primary me-2">Clear</a>
-        </form>
-    </div>
     <div class="container-fluid mt-4">
         {% block content %}{% endblock %}
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 
 </html>
