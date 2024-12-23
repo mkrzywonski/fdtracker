@@ -10,6 +10,7 @@
     </div>
     <div class="card-body">
         <form method="POST" action="{{ url_for('edit_bag', id=bag.id) }}">
+            <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">            
             <div class="mb-3">
                 <label for="contents" class="form-label">Contents</label>
                 <input type="text" class="form-control" id="contents" name="contents" value="{{ bag.contents }}" required>

@@ -158,16 +158,18 @@ def add_bag(tray_id):
         bag_weight = float(request.form['weight'])
         water_needed = weight_loss_ratio * bag_weight
         
-        # Find highest bag number for this batch
-        highest_bag = Bag.query.filter_by(batch_id=tray.batch_id).order_by(Bag.id.desc()).first()
-        print(f"Highest Bag: {highest_bag}")
-            
-        next_number = 1
-        if highest_bag:
-            current_highest = int(highest_bag.id.split('-')[1])
-            next_number = current_highest + 1
+        # Query all bag IDs for the current batch
+        all_bag_ids = db.session.query(Bag.id).filter(Bag.batch_id == tray.batch_id).all()
+        all_bag_ids = [bag_id[0] for bag_id in all_bag_ids]  # Flatten the list
+
+        # Extract the numerical parts after the "-" and sort numerically
+        used_numbers = [
+            int(bag_id.split('-')[1]) for bag_id in all_bag_ids if '-' in bag_id
+        ]
+        next_number = max(used_numbers, default=0) + 1  # Get the next number
             
         bag_id = f"{tray.batch_id:08d}-{next_number}"
+        print(f"Bag ID: {bag_id}")
         
         bag = Bag(
             id=bag_id,
@@ -195,6 +197,9 @@ def consume_bag(id):
     bag = Bag.query.get_or_404(id)
     bag.consumed_date = datetime.utcnow()
     db.session.commit()
+    next_url = request.args.get('next')
+    if next_url:
+        return redirect(next_url)
     return redirect(url_for('index', expanded_batch=bag.batch_id))
 
 @app.route('/print_label/<string:id>')
@@ -347,6 +352,10 @@ def edit_tray(id):
 @app.route('/edit_bag/<string:id>', methods=['GET', 'POST'])
 def edit_bag(id):
     bag = Bag.query.get_or_404(id)
+    next_url = request.args.get('next')
+    if not next_url:
+        next_url = request.form['next']
+    print(f"next: {next_url}")
     if request.method == 'POST':
         # Handle delete action
         if 'delete' in request.form:
@@ -366,8 +375,9 @@ def edit_bag(id):
             bag.consumed_date = datetime.strptime(consumed_date, '%Y-%m-%d') if consumed_date else None
 
             db.session.commit()
-            return redirect(url_for('index', expanded_batch=bag.batch_id))
-    return render_template('edit_bag.html', bag=bag)
+        if next_url:
+            return redirect(next_url)            
+    return render_template('edit_bag.html', bag=bag, next=next_url)
 
 @app.template_filter('highlight')
 def highlight_search(text, search):
@@ -399,6 +409,7 @@ def view_bags():
     page = request.args.get('page', 1, type=int)
     search_query = request.args.get('search', '').strip()
     expanded_bag = request.args.get('expanded_bag', type=str)
+    unopened = request.args.get('unopened', type=str) == 'on'
 
     # Base query
     query = Bag.query
@@ -412,6 +423,9 @@ def view_bags():
                 Bag.notes.ilike(f"%{search_query}%"),
             )
         )
+
+    if unopened:
+        query = query.filter(Bag.consumed_date.is_(None))
 
     if expanded_bag:
         # Get all batch IDs sorted by ID with most recent first
@@ -432,7 +446,8 @@ def view_bags():
         bags=bags,
         pagination=pagination,
         expanded_bag=expanded_bag,
-        search_query=search_query
+        search_query=search_query,
+        unopened=unopened
     )
 
 if __name__ == '__main__':
