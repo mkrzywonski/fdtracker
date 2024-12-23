@@ -168,7 +168,7 @@ def add_bag(tray_id):
         ]
         next_number = max(used_numbers, default=0) + 1  # Get the next number
             
-        bag_id = f"{tray.batch_id:08d}-{next_number}"
+        bag_id = f"{tray.batch_id:08d}-{next_number:02d}"
         print(f"Bag ID: {bag_id}")
         
         bag = Bag(

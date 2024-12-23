@@ -10,7 +10,7 @@
             <div>
                 <label class="checkbox-label">
                 <input type="checkbox" class="form-check-input checkbox" name="unopened" id="unopened" {% if unopened
-                    %}checked{% endif %}> Show only unopened bags
+                    %}checked{% endif %}> Hide consumed bags
             </label>
         </div>
         <div>
@@ -56,13 +56,13 @@
                             Print Label
                         </a>
                         {% if not bag.consumed_date %}
-                        <form method="POST" action="{{ url_for('consume_bag', id=bag.id, next=request.full_path) }}" style="display: inline;">
+                        <form method="POST" action="{{ url_for('consume_bag', id=bag.id, next=request.path + '?expanded_bag=' + bag.id) }}" style="display: inline;">
                             <button type="submit" class="btn btn-primary">
                                 Consume
                             </button>
                         </form>
                         {% endif %}
-                        <a href="{{ url_for('edit_bag', id=bag.id, next=request.full_path) }}" class="btn btn-primary">Edit</a>
+                        <a href="{{ url_for('edit_bag', id=bag.id, next=request.path + '?expanded_bag=' + bag.id) }}" class="btn btn-primary">Edit</a>
                     </div>
                 </div>
             </div>
