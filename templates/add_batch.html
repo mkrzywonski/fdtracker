@@ -3,24 +3,57 @@
 {% block content %}
 <div class="form-title text-center">Add New Batch</div>
 <form method="POST">
-    <div class="mb-3">
-        <label class="form-label">Number of Trays</label>
-        <select name="tray_count" class="form-control" id="trayCount">
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-            <option value="7">7</option>
-        </select>
+    {% if error_messages %}
+    <div class="alert alert-danger">
+        <ul>
+            {% for error in error_messages %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
     </div>
-    <div id="trayContainer">
-        <!-- Tray forms will be dynamically added here -->
+    {% endif %}
+
+    <div class="mb-3 row align-items-center">
+        <label class="form-label col-sm-4 col-form-label text-end text-nowrap">Number of Trays</label>
+        <div class="col-sm-2">
+            <select name="tray_count" class="form-control w-auto" id="trayCount">
+                <option value="" disabled selected>Select...</option>
+                {% for i in range(1, 8) %}
+                <option value="{{ i }}" {% if tray_count and i == tray_count %}selected{% endif %}>
+                    {{ i }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
     </div>
+
+    <div id="trayContainer" data-trays="{{ trays | tojson | safe }}">
+        {% for i in range(tray_count) %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h2 class="card-title">Tray {{ i + 1 }}</h2>
+                <div class="mb-3">
+                    <label class="form-label">Contents</label>
+                    <input type="text" name="contents_{{ i }}" class="form-control" 
+                           value="{{ trays[i]['contents'] if trays|length > i else '' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Initial Weight (g)</label>
+                    <input type="number" step="0.01" name="starting_weight_{{ i }}" class="form-control" 
+                           value="{{ trays[i]['starting_weight'] if trays|length > i else '' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Notes</label>
+                    <textarea name="notes_{{ i }}" class="form-control" rows="2">{{ trays[i]['notes'] if trays|length > i else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
     <div class="mb-3">
         <label class="form-label">Batch Notes</label>
-        <textarea name="batch_notes" class="form-control" rows="3"></textarea>
+        <textarea name="batch_notes" class="form-control" rows="3">{{ batch_notes if batch_notes else '' }}</textarea>
     </div>
     <button type="submit" class="btn btn-primary">Start Batch</button>
 </form>
@@ -28,25 +61,29 @@
 <script>
 document.getElementById('trayCount').addEventListener('change', function() {
     const container = document.getElementById('trayContainer');
-    container.innerHTML = '';
     const count = parseInt(this.value);
+    const existingTrays = JSON.parse(container.getAttribute('data-trays') || '[]'); // Get preserved tray data
+
+    container.innerHTML = ''; // Clear the container
     
     for (let i = 0; i < count; i++) {
+        const tray = existingTrays[i] || { contents: '', starting_weight: '', notes: '' }; // Use preserved data if available
+        
         container.innerHTML += `
             <div class="card mb-3">
                 <div class="card-body">
                     <h2 class="card-title">Tray ${i + 1}</h2>
                     <div class="mb-3">
                         <label class="form-label">Contents</label>
-                        <input type="text" name="contents_${i}" class="form-control" required>
+                        <input type="text" name="contents_${i}" class="form-control" value="${tray.contents}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Initial Weight (g)</label>
-                        <input type="number" step="0.01" name="starting_weight_${i}" class="form-control" required>
+                        <input type="number" step="0.01" name="starting_weight_${i}" class="form-control" value="${tray.starting_weight}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Notes</label>
-                        <textarea name="notes_${i}" class="form-control" rows="2"></textarea>
+                        <textarea name="notes_${i}" class="form-control" rows="2">${tray.notes}</textarea>
                     </div>
                 </div>
             </div>
@@ -54,7 +91,7 @@ document.getElementById('trayCount').addEventListener('change', function() {
     }
 });
 
-// Trigger initial tray form
+// Trigger the script when the page loads, preserving server-rendered data
 document.getElementById('trayCount').dispatchEvent(new Event('change'));
 </script>
 {% endblock %}

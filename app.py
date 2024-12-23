@@ -14,39 +14,22 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///freezedry.db'
 db = SQLAlchemy(app)
 PER_PAGE = 25  # Number of items per page
 
-class Bag(db.Model):
-    id = db.Column(db.String(20), primary_key=True)
-    batch_id = db.Column(db.Integer, db.ForeignKey('batch.id'), nullable=False)
-    contents = db.Column(db.String(100), nullable=False)
-    weight = db.Column(db.Float, nullable=False)
-    location = db.Column(db.String(100))
-    notes = db.Column(db.Text)
-    water_needed = db.Column(db.Float)
-    created_date = db.Column(db.DateTime, default=datetime.utcnow)
-    consumed_date = db.Column(db.DateTime)
-
-class Tray(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    batch_id = db.Column(db.Integer, db.ForeignKey('batch.id'), nullable=False)
-    contents = db.Column(db.String(100), nullable=False)
-    starting_weight = db.Column(db.Float)
-    ending_weight = db.Column(db.Float)
-    previous_weight = db.Column(db.Float)
-    notes = db.Column(db.Text)
-    position = db.Column(db.Integer, nullable=False)  # Tray position in the machine
-
 class Batch(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    __tablename__ = 'batch'
+    id = db.Column(db.Integer, primary_key=True, index=True)
     start_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     end_date = db.Column(db.DateTime)
-    notes = db.Column(db.Text)
+    notes = db.Column(db.Text, index=True)  # Add index for better search performance
     status = db.Column(db.String(20), default='In Progress')
-    trays = db.relationship('Tray', backref='batch', lazy=True, 
-                          order_by='Tray.position',
-                          cascade='all, delete-orphan')
-    bags = db.relationship('Bag', backref='batch', lazy=True, 
-                          order_by='Bag.created_date',
-                          cascade='all, delete-orphan')
+
+    # Relationships with cascading deletes and lazy loading
+    trays = db.relationship(
+        'Tray', backref='batch', lazy='dynamic', cascade='all, delete-orphan'
+    )
+    bags = db.relationship(
+        'Bag', backref='batch', lazy='dynamic', cascade='all, delete-orphan'
+    )
+
     @property
     def total_starting_weight(self):
         return sum(tray.starting_weight or 0 for tray in self.trays)
@@ -54,6 +37,35 @@ class Batch(db.Model):
     @property
     def total_ending_weight(self):
         return sum(tray.ending_weight or 0 for tray in self.trays)
+
+
+class Tray(db.Model):
+    __tablename__ = 'tray'
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(
+        db.Integer, db.ForeignKey('batch.id', ondelete='CASCADE'), nullable=False, index=True
+    )
+    contents = db.Column(db.String(100), nullable=False, index=True)
+    starting_weight = db.Column(db.Float)
+    ending_weight = db.Column(db.Float)
+    previous_weight = db.Column(db.Float)
+    notes = db.Column(db.Text, index=True)
+    position = db.Column(db.Integer, nullable=False)  # Tray position in the machine
+
+
+class Bag(db.Model):
+    __tablename__ = 'bag'
+    id = db.Column(db.String(20), primary_key=True)
+    batch_id = db.Column(
+        db.Integer, db.ForeignKey('batch.id', ondelete='CASCADE'), nullable=False, index=True
+    )
+    contents = db.Column(db.String(100), nullable=False, index=True)
+    weight = db.Column(db.Float, nullable=False)
+    location = db.Column(db.String(100), index=True)
+    notes = db.Column(db.Text, index=True)
+    water_needed = db.Column(db.Float)
+    created_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    consumed_date = db.Column(db.DateTime)
 
 @app.route('/')
 def index():
@@ -71,26 +83,26 @@ def index():
         except ValueError:
             search_id = None
 
-        query = query.outerjoin(Tray).outerjoin(Bag).filter(
-            db.or_(
-                Batch.id == search_id,
-                Batch.notes.ilike(f"%{search_query}%"),
+        filters = [Batch.id == search_id, Batch.notes.ilike(f"%{search_query}%")]
+
+        if search_query:
+            filters.extend([
                 Tray.contents.ilike(f"%{search_query}%"),
                 Tray.notes.ilike(f"%{search_query}%"),
                 Bag.contents.ilike(f"%{search_query}%"),
                 Bag.notes.ilike(f"%{search_query}%"),
-            )
-        )
+            ])
 
+        query = query.outerjoin(Tray).outerjoin(Bag).filter(or_(*filters))
+
+    # Handle expanded batch
     if expanded_batch:
-        # Get all batch IDs sorted by ID with most recent first
         all_batches = query.order_by(Batch.id.desc()).all()
         batch_ids = [batch.id for batch in all_batches]
 
-        # Determine the page where the expanded_batch resides
         if expanded_batch in batch_ids:
             batch_index = batch_ids.index(expanded_batch)
-            page = (batch_index // PER_PAGE) + 1  # Use PER_PAGE
+            page = (batch_index // PER_PAGE) + 1
 
     # Paginate the filtered results
     pagination = query.order_by(Batch.id.desc()).paginate(page=page, per_page=PER_PAGE)
@@ -107,40 +119,95 @@ def index():
 @app.route('/add', methods=['GET', 'POST'])
 def add_batch():
     if request.method == 'POST':
-        batch = Batch(
-            notes=request.form['batch_notes']
-        )
-        db.session.add(batch)
-        
-        # Handle multiple trays
         tray_count = int(request.form['tray_count'])
+        error_messages = []
+        trays = []
+
+        # Validate tray weights and gather data
         for i in range(tray_count):
-            if request.form.get(f'contents_{i}'):  # Only add trays with contents
-                tray = Tray(
-                    contents=request.form[f'contents_{i}'],
-                    starting_weight=float(request.form[f'starting_weight_{i}']),
-                    notes=request.form.get(f'notes_{i}', ''),
-                    position=i + 1
-                )
-                batch.trays.append(tray)
-        
+            contents = request.form.get(f'contents_{i}', '')
+            starting_weight = request.form.get(f'starting_weight_{i}', '')
+            notes = request.form.get(f'notes_{i}', '')
+
+            try:
+                starting_weight = float(starting_weight)
+                if starting_weight <= 0:
+                    error_messages.append(f"Tray {i + 1}: Initial weight must be greater than 0.")
+            except (ValueError, TypeError):
+                error_messages.append(f"Tray {i + 1}: Initial weight must be a valid number.")
+
+            # Append the entered data for each tray (preserving input even if invalid)
+            trays.append({
+                "contents": contents,
+                "starting_weight": starting_weight if isinstance(starting_weight, float) else '',
+                "notes": notes
+            })
+
+        # If there are errors, return the form with error messages and pre-filled data
+        if error_messages:
+            return render_template(
+                'add_batch.html',
+                error_messages=error_messages,
+                tray_count=tray_count,
+                trays=trays,
+                batch_notes=request.form.get('batch_notes', '')
+            )
+
+        # Create a new batch
+        batch = Batch(notes=request.form['batch_notes'])
+        db.session.add(batch)
+
+        # Add trays to the batch
+        for i, tray_data in enumerate(trays):
+            tray = Tray(
+                contents=tray_data["contents"],
+                starting_weight=tray_data["starting_weight"],
+                notes=tray_data["notes"],
+                position=i + 1
+            )
+            batch.trays.append(tray)
+
         db.session.commit()
         return redirect(url_for('index'))
-    return render_template('add_batch.html')
 
-@app.route('/complete/<int:id>', methods=['POST'])
+    # Default state for a new form
+    return render_template('add_batch.html', tray_count=1, trays=[], batch_notes='')
+
+@app.route('/complete_batch/<int:id>', methods=['POST'])
 def complete_batch(id):
     batch = Batch.query.get_or_404(id)
-    batch.status = 'Completed'
-    batch.end_date = datetime.utcnow()
-    
-    # Update each tray's final weight
+    error_messages = []
+
+    # Validate weights for each tray
     for tray in batch.trays:
-        tray_id = str(tray.id)
-        if f'ending_weight_{tray_id}' in request.form:
-            tray.ending_weight = float(request.form[f'ending_weight_{tray_id}'])
-    
+        ending_weight = request.form.get(f'ending_weight_{tray.id}', None)
+        try:
+            ending_weight = float(ending_weight)
+            if ending_weight <= 0:
+                error_messages.append(f"Tray {tray.position}: Final weight must be greater than 0.")
+            elif ending_weight > tray.starting_weight:
+                error_messages.append(f"Tray {tray.position}: Final weight cannot exceed the initial weight.")
+        except (ValueError, TypeError):
+            error_messages.append(f"Tray {tray.position}: Final weight must be a valid number.")
+
+    # If there are validation errors, re-render the batch page with errors
+    if error_messages:
+        return render_template(
+            'batches.html',
+            batches=[batch],  # Only show the current batch
+            expanded_batch=id,
+            error_messages=error_messages
+        )
+
+    # Update tray weights and mark batch as complete
+    for tray in batch.trays:
+        ending_weight = float(request.form[f'ending_weight_{tray.id}'])
+        tray.ending_weight = ending_weight
+
+    batch.status = 'Complete'
+    batch.end_date = datetime.utcnow()
     db.session.commit()
+
     return redirect(url_for('index'))
 
 @app.route('/delete/<int:id>', methods=['POST'])
@@ -154,6 +221,8 @@ def delete_batch(id):
 def add_bag(tray_id):
     tray = Tray.query.get_or_404(tray_id)
     if request.method == 'POST':
+        if tray.ending_weight is None or tray.ending_weight <= 0:
+            tray.ending_weight = tray.starting_weight
         weight_loss_ratio = (tray.starting_weight - tray.ending_weight) / tray.ending_weight
         bag_weight = float(request.form['weight'])
         water_needed = weight_loss_ratio * bag_weight
@@ -414,28 +483,28 @@ def view_bags():
     # Base query
     query = Bag.query
 
-    # Apply search filter if a search query is provided
+    # Apply search filter
     if search_query:
         query = query.filter(
-            db.or_(
+            or_(
                 Bag.id.ilike(f"%{search_query}%"),
                 Bag.contents.ilike(f"%{search_query}%"),
                 Bag.notes.ilike(f"%{search_query}%"),
             )
         )
 
+    # Filter for unopened bags
     if unopened:
         query = query.filter(Bag.consumed_date.is_(None))
 
+    # Handle expanded bag
     if expanded_bag:
-        # Get all batch IDs sorted by ID with most recent first
         all_bags = query.order_by(Bag.id.desc()).all()
         bag_ids = [bag.id for bag in all_bags]
 
-        # Determine the page where the expanded_batch resides
         if expanded_bag in bag_ids:
             bag_index = bag_ids.index(expanded_bag)
-            page = (bag_index // PER_PAGE) + 1  # Use PER_PAGE
+            page = (bag_index // PER_PAGE) + 1
 
     # Paginate the filtered results
     pagination = query.order_by(Bag.id.desc()).paginate(page=page, per_page=PER_PAGE)
