@@ -25,6 +25,9 @@ A web application for tracking freeze-dried food batches. This tool allows you t
   - Search batches, trays, and bags by keywords.
   - Filter consumed or unopened bags.
 
+- **Lightweight**
+  - Can be run on a Raspberry PI Zero 2W or other small computer.
+
 ## Technologies Used
 
 - **Backend**: Flask (Python)
