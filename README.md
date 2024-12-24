@@ -1,6 +1,6 @@
 # Freeze Dry Tracker
 
-A web application for tracking freeze-dried food batches, trays, and bags. This tool allows you to manage the entire process, from batch creation to packaging and inventory management, with features like water removal calculation and label generation.
+A web application for tracking freeze-dried food batches. This tool allows you to manage the entire process, from batch creation to packaging and inventory management, with features like water removal calculation and label generation.
 
 ## Features
 
@@ -53,20 +53,12 @@ A web application for tracking freeze-dried food batches, trays, and bags. This 
    pip install -r requirements.txt
    ```
 
-4. Initialize the database:
-   ```bash
-   python
-   >>> from app import db
-   >>> db.create_all()
-   >>> exit()
-   ```
-
-5. Run the development server:
+4. Run the development server:
    ```bash
    python app.py
    ```
 
-6. Access the application in your browser at:
+5. Access the application in your browser at:
    ```
    http://127.0.0.1:5000
    ```
@@ -77,8 +69,9 @@ A web application for tracking freeze-dried food batches, trays, and bags. This 
    - Navigate to the "New Batch" page and fill in the required information.
    - Add trays to the batch, specifying their contents and initial weights.
 
-2. **Update Trays**:
+2. **Update Tray Weights**:
    - Monitor tray weights during freeze-drying.
+   - Keep track of tray weights to determine if you need more drying time.
    - Enter the final weights when the process is complete.
 
 3. **Package Contents**:
