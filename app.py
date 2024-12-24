@@ -241,7 +241,6 @@ def add_bag(tray_id):
         next_number = max(used_numbers, default=0) + 1  # Get the next number
             
         bag_id = f"{tray.batch_id:08d}-{next_number:02d}"
-        print(f"Bag ID: {bag_id}")
         
         bag = Bag(
             id=bag_id,
@@ -279,7 +278,7 @@ def print_label(id):
     bag = Bag.query.get_or_404(id)
 
     # Create QR code with batch URL
-    batch_url = url_for('view_batches', expanded_batch=bag.batch_id, _external=True)
+    batch_url = url_for('view_bags', expanded_bag=bag.id, _external=True)
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(batch_url)
     qr.make(fit=True)
@@ -427,7 +426,6 @@ def edit_bag(id):
     next_url = request.args.get('next')
     if not next_url:
         next_url = request.form['next']
-    print(f"next: {next_url}")
     if request.method == 'POST':
         # Handle delete action
         if 'delete' in request.form:
