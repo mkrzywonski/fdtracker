@@ -12,6 +12,6 @@
 
 <form method="POST" action="{{ url_for('complete_batch', id=batch.id) }}">
     <button type="submit" class="btn btn-success">Yes, Complete Batch</button>
-    <a href="{{ url_for('index', expanded_batch=batch.id) }}" class="btn btn-secondary">Cancel</a>
+    <a href="{{ url_for('view_batches', expanded_batch=batch.id) }}" class="btn btn-secondary">Cancel</a>
 </form>
 {% endblock %}

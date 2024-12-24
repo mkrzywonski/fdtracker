@@ -8,6 +8,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from markupsafe import Markup
 import re
+from sqlalchemy import or_
+
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///freezedry.db'
@@ -68,7 +70,7 @@ class Bag(db.Model):
     consumed_date = db.Column(db.DateTime)
 
 @app.route('/')
-def index():
+def view_batches():
     page = request.args.get('page', 1, type=int)
     search_query = request.args.get('search', '').strip()
     expanded_batch = request.args.get('expanded_batch', type=int)
@@ -168,7 +170,7 @@ def add_batch():
             batch.trays.append(tray)
 
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('view_batches'))
 
     # Default state for a new form
     return render_template('add_batch.html', tray_count=1, trays=[], batch_notes='')
@@ -208,14 +210,14 @@ def complete_batch(id):
     batch.end_date = datetime.utcnow()
     db.session.commit()
 
-    return redirect(url_for('index'))
+    return redirect(url_for('view_batches'))
 
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete_batch(id):
     batch = Batch.query.get_or_404(id)
     db.session.delete(batch)
     db.session.commit()
-    return redirect(url_for('index'))
+    return redirect(url_for('view_batches'))
 
 @app.route('/add_bag/<int:tray_id>', methods=['GET', 'POST'])
 def add_bag(tray_id):
@@ -226,6 +228,7 @@ def add_bag(tray_id):
         weight_loss_ratio = (tray.starting_weight - tray.ending_weight) / tray.ending_weight
         bag_weight = float(request.form['weight'])
         water_needed = weight_loss_ratio * bag_weight
+        water_needed = round(water_needed, 1)
         
         # Query all bag IDs for the current batch
         all_bag_ids = db.session.query(Bag.id).filter(Bag.batch_id == tray.batch_id).all()
@@ -251,7 +254,7 @@ def add_bag(tray_id):
         )
         db.session.add(bag)
         db.session.commit()
-        return redirect(url_for('index', expanded_batch=tray.batch_id))
+        return redirect(url_for('view_batches', expanded_batch=tray.batch_id))
     return render_template('add_bag.html', tray=tray)
 
 @app.route('/delete_bag/<string:id>', methods=['POST'])
@@ -259,7 +262,7 @@ def delete_bag(id):
     bag = Bag.query.get_or_404(id)
     db.session.delete(bag)
     db.session.commit()
-    return redirect(url_for('index', expanded_batch=bag.batch_id))
+    return redirect(url_for('view_batches', expanded_batch=bag.batch_id))
 
 @app.route('/consume_bag/<string:id>', methods=['POST'])
 def consume_bag(id):
@@ -269,14 +272,14 @@ def consume_bag(id):
     next_url = request.args.get('next')
     if next_url:
         return redirect(next_url)
-    return redirect(url_for('index', expanded_batch=bag.batch_id))
+    return redirect(url_for('view_batches', expanded_batch=bag.batch_id))
 
 @app.route('/print_label/<string:id>')
 def print_label(id):
     bag = Bag.query.get_or_404(id)
 
     # Create QR code with batch URL
-    batch_url = url_for('index', expanded_batch=bag.batch_id, _external=True)
+    batch_url = url_for('view_batches', expanded_batch=bag.batch_id, _external=True)
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(batch_url)
     qr.make(fit=True)
@@ -395,7 +398,7 @@ def edit_batch(id):
             db.session.delete(bag)
 
         db.session.commit()
-        return redirect(url_for('index', expanded_batch=batch.id))
+        return redirect(url_for('view_batches', expanded_batch=batch.id))
 
     return render_template('edit_batch.html', batch=batch)
 
@@ -408,14 +411,14 @@ def edit_tray(id):
             batch_id = tray.batch_id
             db.session.delete(tray)
             db.session.commit()
-            return redirect(url_for('index', id=batch_id))
+            return redirect(url_for('view_batches', expanded_batch=batch_id))
         else:
             tray.contents = request.form['contents']
             tray.starting_weight = float(request.form['starting_weight']) if request.form['starting_weight'] else None
             tray.ending_weight = float(request.form['ending_weight']) if request.form['ending_weight'] else None
             tray.notes = request.form['notes']
             db.session.commit()
-            return redirect(url_for('index', expanded_batch=tray.batch_id))
+            return redirect(url_for('view_batches', expanded_batch=tray.batch_id))
     return render_template('edit_tray.html', tray=tray)
 
 @app.route('/edit_bag/<string:id>', methods=['GET', 'POST'])
@@ -431,7 +434,7 @@ def edit_bag(id):
             batch_id = bag.batch_id
             db.session.delete(bag)
             db.session.commit()
-            return redirect(url_for('edit_batch', id=batch_id))
+            return redirect(next_url)
         else:
             # Update bag details
             bag.contents = request.form['contents']
@@ -471,7 +474,7 @@ def update_weight(batch_id):
     db.session.commit()
 
     # Redirect back to the batch details page with the batch expanded
-    return redirect(url_for('index', expanded_batch=batch.id))
+    return redirect(url_for('view_batches', expanded_batch=batch.id))
 
 @app.route('/view_bags')
 def view_bags():

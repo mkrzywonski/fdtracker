@@ -2,11 +2,11 @@
 
 {% block content %}
 <div class="container-fluid mt-4">
-    <form class="d-flex" method="GET" action="{{ url_for('index') }}">
+    <form class="d-flex" method="GET" action="{{ url_for('view_batches') }}">
         <input class="form-control me-2 border-primary" type="search" name="search" placeholder="Search..."
             aria-label="Search" value="{{ search_query if search_query else '' }}">
         <button class="btn btn-primary me-2" type="submit">Search</button>
-        <a href="{{ url_for('index') }}" class="btn btn-outline-primary me-2">Clear</a>
+        <a href="{{ url_for('view_batches') }}" class="btn btn-outline-primary me-2">Clear</a>
     </form>
 </div>
 <br>
@@ -141,19 +141,19 @@
                                         {% endif %}
                                     </p>
                                     <div class="d-flex gap-2">
-                                        <a href="{{ url_for('print_label', id=bag.id, next=request.path + '?expanded_bag=' + bag.id) }}" class="btn btn-success"
+                                        <a href="{{ url_for('print_label', id=bag.id) }}" class="btn btn-success"
                                             target="_blank">
                                             Print Label
                                         </a>
                                         {% if not bag.consumed_date %}
-                                        <form method="POST" action="{{ url_for('consume_bag', id=bag.id, next=request.path + '?expanded_bag=' + bag.id) }}"
+                                        <form method="POST" action="{{ url_for('consume_bag', id=bag.id, next=request.path + '?expanded_batch=' + (bag.batch_id | string)) }}"
                                             style="display: inline;">
                                             <button type="submit" class="btn btn-success">
                                                 Consume
                                             </button>
                                         </form>
                                         {% endif %}
-                                        <a href="{{ url_for('edit_bag', id=bag.id, next=request.path + '?expanded_bag=' + bag.id) }}" class="btn btn-success">Edit</a>
+                                        <a href="{{ url_for('edit_bag', id=bag.id, next=request.path + '?expanded_batch=' + (bag.batch_id | string)) }}" class="btn btn-success">Edit</a>
                                     </div>
                                 </div>
                             </div>
@@ -163,7 +163,7 @@
                     {% endif %}
                 </div>
                 <div class="card-footer">
-                    <a href="{{ url_for('edit_batch', id=batch.id, expanded_batch=batch.id) }}" class="btn btn-primary">
+                    <a href="{{ url_for('edit_batch', id=batch.id, next=request.path + '?expanded_batch=' + (batch.id | string)) }}" class="btn btn-primary">
                         Edit Batch
                     </a>
                 </div>
@@ -178,13 +178,13 @@
         <ul class="pagination">
             {% if pagination.has_prev %}
             <li class="page-item">
-                <a class="page-link" href="{{ url_for('index', page=pagination.prev_num) }}">Previous</a>
+                <a class="page-link" href="{{ url_for('view_batches', page=pagination.prev_num) }}">Previous</a>
             </li>
             {% endif %}
             {% for page in pagination.iter_pages() %}
             {% if page %}
             <li class="page-item {% if page == pagination.page %}active{% endif %}">
-                <a class="page-link" href="{{ url_for('index', page=page) }}">{{ page }}</a>
+                <a class="page-link" href="{{ url_for('view_batches', page=page) }}">{{ page }}</a>
             </li>
             {% else %}
             <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -193,7 +193,7 @@
 
             {% if pagination.has_next %}
             <li class="page-item">
-                <a class="page-link" href="{{ url_for('index', page=pagination.next_num) }}">Next</a>
+                <a class="page-link" href="{{ url_for('view_batches', page=pagination.next_num) }}">Next</a>
             </li>
             {% endif %}
         </ul>
