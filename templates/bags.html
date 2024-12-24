@@ -43,6 +43,10 @@
             <div class="collapse {% if bag.id == expanded_bag %}show{% endif %}" id="bag{{ bag.id }}">
                 <div class="row mb-3 card border border-primary card-body">
                     <p class="card-text">
+                        From Batch:
+			<a href="{{ url_for('view_batches', expanded_batch=bag.batch_id) }}">
+			{{ "{:08}".format(bag.batch_id, '0') }}
+			</a><br>
                         Date: {{ bag.created_date.strftime('%Y-%m-%d') }}<br>
                         Location: {{ bag.location }}<br>
                         {% if bag.consumed_date %}
