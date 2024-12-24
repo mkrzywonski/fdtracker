@@ -82,31 +82,9 @@ A web application for tracking freeze-dried food batches. This tool allows you t
    - View and search through batches, trays, and bags.
    - Mark bags as consumed or update their details.
 
-## Screenshots
-
-- Add a batch
-- View batches
-- Edit trays and bags
-- Generate and print labels
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix.
-3. Submit a pull request with a detailed description.
-
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Acknowledgements
-
-- [Bootstrap](https://getbootstrap.com/) for responsive design.
-- [Flask](https://flask.palletsprojects.com/) for the web framework.
-- [SQLite](https://www.sqlite.org/) for the database.
-- [ReportLab](https://www.reportlab.com/) for PDF generation.
+This project is licensed under the GNU General Public License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
