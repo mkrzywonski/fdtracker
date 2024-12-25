@@ -41,8 +41,8 @@ A web application for tracking freeze-dried food batches. This tool allows you t
 
 1. Clone the repository:
    ```bash
-   git clone <repository_url>
-   cd <repository_name>
+   git clone https://github.com/mkrzywonski/fdtracker.git
+   cd fdtracker
    ```
 
 2. Set up a virtual environment:
