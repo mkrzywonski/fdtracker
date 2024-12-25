@@ -303,7 +303,7 @@ def print_label(id):
     def draw_footer(canvas, doc):
         qr_img = RLImage(qr_buffer, width=1.5 * inch, height=1.5 * inch)
         qr_x = (PAGE_WIDTH - qr_img.drawWidth) / 2
-        qr_y = 0.5 * inch
+        qr_y = 0.25 * inch
         qr_img.drawOn(canvas, qr_x, qr_y)
 
         url_style = ParagraphStyle(
@@ -315,7 +315,7 @@ def print_label(id):
         url_width, url_height = url_paragraph.wrap(PAGE_WIDTH - 2 * MARGIN, 0)
         url_x = (PAGE_WIDTH - url_width) / 2
         canvas.saveState()
-        url_paragraph.drawOn(canvas, url_x, qr_y - url_height - 10)  # Position below QR code
+        url_paragraph.drawOn(canvas, url_x, qr_y - url_height)  # Position below QR code
         canvas.restoreState()
 
     # Set up the document
