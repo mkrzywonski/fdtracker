@@ -26,7 +26,7 @@ A web application for tracking freeze-dried food batches. This tool allows you t
   - Filter consumed or unopened bags.
 
 - **Lightweight**
-  - Can be run on a Raspberry PI Zero 2W or other small computer.
+  - Can be run on a Raspberry PI or other small computer.
 
 ## Technologies Used
 
