@@ -9,9 +9,40 @@ from reportlab.lib.units import inch
 from markupsafe import Markup
 import re
 from sqlalchemy import or_
+import configparser
+from werkzeug.middleware.proxy_fix import ProxyFix
+from urllib.parse import urlparse
 
+# Read the configuration file
+config = configparser.ConfigParser()
+config.read('config.ini')
 
+# Get internal Flask binding settings
+flask_host = config.get('server', 'flask_host', fallback='127.0.0.1')
+flask_port = config.getint('server', 'flask_port', fallback=5000)
+
+# Get public-facing URL
+public_url = config.get('server', 'public_url', fallback=None)
+
+# Parse the public URL into components (if provided)
+if public_url:
+    parsed_url = urlparse(public_url)
+    public_host = parsed_url.netloc  # Includes domain and port
+    public_scheme = parsed_url.scheme  # http or https
+else:
+    public_host = None
+    public_scheme = None
+
+# Flask app setup
 app = Flask(__name__)
+
+# Set SERVER_NAME if the public host is configured
+if public_host:
+    app.config['SERVER_NAME'] = public_host
+
+# Middleware for reverse proxy headers
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///freezedry.db'
 db = SQLAlchemy(app)
 PER_PAGE = 25  # Number of items per page
@@ -523,4 +554,4 @@ def view_bags():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(debug=True, host=flask_host, port=flask_port)
