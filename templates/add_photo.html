@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="mb-4">Add Photo to Batch #{{ '%08d' % batch.id }}</h1>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<!-- Add Photo Card -->
+<div class="card border border-dark mb-4">
+    <div class="card-header bg-primary text-white">
+        Upload Photo
+    </div>
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data" action="{{ url_for('add_photo', batch_id=batch.id) }}">
+            <div class="mb-5">
+                <label for="photo" class="btn btn-primary">Select Photo</label>
+                <input class="form-control form-control-sm" type="file" id="photo" name="photo" accept="image/*" style="display: none;" required onchange="previewImage(this)">
+            </div>
+            <div class="mb-3">
+                <label for="caption" class="form-label">Photo Caption</label>
+                <textarea class="form-control" id="caption" name="caption" rows="2"></textarea>
+            </div>
+            <div class="mb-3">
+                <img id="preview" src="" alt="Preview" style="max-width: 100%; display: none;" class="img-thumbnail">
+            </div>
+            <div class="card-footer">
+                <button type="submit" id="upload-button" class="btn btn-secondary" disabled>Upload</button>
+                <a href="{{ url_for('view_batches', expanded_batch=batch.id) }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function previewImage(input) {
+    const preview = document.getElementById('preview');
+    const uploadButton = document.getElementById('upload-button');
+
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+
+        // Enable the upload button
+        uploadButton.classList.remove('btn-secondary');
+        uploadButton.classList.add('btn-primary');
+        uploadButton.disabled = false;
+    } else {
+        // Reset the preview and disable the upload button
+        preview.style.display = 'none';
+        preview.src = '';
+        uploadButton.classList.remove('btn-primary');
+        uploadButton.classList.add('btn-secondary');
+        uploadButton.disabled = true;
+    }
+}
+</script>
+
+{% endblock %}

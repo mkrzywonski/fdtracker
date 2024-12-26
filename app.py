@@ -12,6 +12,9 @@ from sqlalchemy import or_
 import configparser
 from werkzeug.middleware.proxy_fix import ProxyFix
 from urllib.parse import urlparse
+import os
+from werkzeug.utils import secure_filename
+from PIL import Image
 
 # Read the configuration file
 config = configparser.ConfigParser()
@@ -47,6 +50,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///freezedry.db'
 db = SQLAlchemy(app)
 PER_PAGE = 25  # Number of items per page
 
+UPLOAD_FOLDER = 'static/uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
 class Batch(db.Model):
     __tablename__ = 'batch'
     id = db.Column(db.Integer, primary_key=True, index=True)
@@ -62,11 +71,12 @@ class Batch(db.Model):
     bags = db.relationship(
         'Bag', backref='batch', lazy='dynamic', cascade='all, delete-orphan'
     )
-
+    photos = db.relationship(
+        'Photo', backref='batch', lazy='dynamic', cascade='all, delete-orphan'
+    )
     @property
     def total_starting_weight(self):
         return sum(tray.starting_weight or 0 for tray in self.trays)
-
     @property
     def total_ending_weight(self):
         return sum(tray.ending_weight or 0 for tray in self.trays)
@@ -99,6 +109,14 @@ class Bag(db.Model):
     water_needed = db.Column(db.Float)
     created_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     consumed_date = db.Column(db.DateTime)
+
+class Photo(db.Model):
+    __tablename__ = 'photo'
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('batch.id', ondelete='CASCADE'), nullable=False, index=True)
+    filename = db.Column(db.String(255), nullable=False)
+    caption = db.Column(db.Text)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 @app.route('/')
 def view_batches():
@@ -201,7 +219,7 @@ def add_batch():
             batch.trays.append(tray)
 
         db.session.commit()
-        return redirect(url_for('view_batches'))
+        return redirect(url_for('view_batches', expanded_batch=batch.id))
 
     # Default state for a new form
     return render_template('add_batch.html', tray_count=1, trays=[], batch_notes='')
@@ -246,6 +264,13 @@ def complete_batch(id):
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete_batch(id):
     batch = Batch.query.get_or_404(id)
+    
+    # Delete all photo files associated with this batch
+    for photo in batch.photos:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], photo.filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    
     db.session.delete(batch)
     db.session.commit()
     return redirect(url_for('view_batches'))
@@ -428,6 +453,14 @@ def edit_batch(id):
             bag = Bag.query.get(bag_id)
             db.session.delete(bag)
 
+        # Deleting Photos
+        photos_to_delete = request.form.getlist('delete_photo')
+        for photo_id in photos_to_delete:
+            photo = Photo.query.get(photo_id)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], photo.filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            db.session.delete(photo)
         db.session.commit()
         return redirect(url_for('view_batches', expanded_batch=batch.id))
 
@@ -560,6 +593,59 @@ def favicon():
         mimetype='image/svg+xml'
     )
 
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def resize_and_convert_image(image_path, max_width=800, max_height=600, quality=80):
+    with Image.open(image_path) as img:
+        # Convert to RGB if needed (in case of PNG with transparency)
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+        
+        # Resize maintaining aspect ratio
+        img.thumbnail((max_width, max_height))
+        
+        # Get the output path with .jpg extension
+        output_path = os.path.splitext(image_path)[0] + '.jpg'
+        
+        # Save as JPEG with specified quality
+        img.save(output_path, 'JPEG', quality=quality)
+        
+        # Remove original file if different from output
+        if output_path != image_path:
+            os.remove(image_path)
+            
+        return os.path.basename(output_path)
+
+@app.route('/add_photo/<int:batch_id>', methods=['GET', 'POST'])
+def add_photo(batch_id):
+    batch = Batch.query.get_or_404(batch_id)
+    if request.method == 'POST':
+        if 'photo' not in request.files:
+            return render_template('add_photo.html', batch=batch, error="No file part")
+
+        file = request.files['photo']
+        caption = request.form.get('caption', '')
+        
+        if file.filename == '':
+            return render_template('add_photo.html', batch=batch, error="No selected file")
+        if file and allowed_file(file.filename):
+            photo = Photo(batch_id=batch_id, filename='temp', caption=caption)
+            db.session.add(photo)
+            db.session.flush()
+
+            original_name = secure_filename(file.filename)
+            temp_filename = f"IMG_{photo.id}{os.path.splitext(original_name)[1]}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], temp_filename)
+            file.save(filepath)
+            
+            final_filename = resize_and_convert_image(filepath)
+            photo.filename = final_filename
+            
+            db.session.commit()
+            return redirect(url_for('view_batches', expanded_batch=batch_id))
+    
+    return render_template('add_photo.html', batch=batch)
 
 if __name__ == '__main__':
     with app.app_context():

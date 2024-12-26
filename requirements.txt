@@ -2,4 +2,4 @@ flask
 flask_sqlalchemy
 qrcode
 reportlab
-
+pillow
