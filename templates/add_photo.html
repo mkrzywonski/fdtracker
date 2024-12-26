@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Add Photo to Batch #{{ '%08d' % batch.id }}</h1>
+    
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('add_photo', batch_id=batch.id) }}">
+        <div class="mb-3">
+            <label for="photo" class="form-label">Choose or Take a Photo</label>
+            <input class="form-control" type="file" id="photo" name="photo" accept="image/*" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Upload Photo</button>
+        <a href="{{ url_for('view_batches', expanded_batch=batch.id) }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}
+
+function previewImage(input) {
+    const preview = document.getElementById('preview');
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+<div class="mb-3">
+    <img id="preview" src="" alt="Preview" style="max-width: 100%; display: none;" class="img-thumbnail">
+</div>

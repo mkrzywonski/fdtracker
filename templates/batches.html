@@ -16,196 +16,239 @@
 <h1>Batches</h1>
 {% endif %}
 <div class="row">
-    {% for batch in batches %}
-    <div class="col-12 mb-4">
-        <div class="card border border-dark">
-            <div class="card-header" role="button" data-bs-toggle="collapse" data-bs-target="#batch{{ batch.id }}"
-                aria-expanded="false">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="batch-name">Batch #{{ '%08d' % batch.id }}</span>
-                    {% if batch.end_date %}
-                    <span class="badge bg-secondary">
-                        Completed: {{ batch.end_date.strftime('%Y-%m-%d') }}
-                    </span>
-                    {% else %}
-                    <span class="badge bg-success">
-                        Started: {{ batch.start_date.strftime('%Y-%m-%d') }}
-                    </span>
-                    {% endif %}
+    <div class="row">
+        {% for batch in batches %}
+        <div class="col-12 mb-4">
+            <div class="card border border-dark">
+                <div class="card-header" role="button" data-bs-toggle="collapse" data-bs-target="#batch{{ batch.id }}"
+                    aria-expanded="false">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="batch-name">Batch #{{ '%08d' % batch.id }}</span>
+                        {% if batch.end_date %}
+                        <span class="badge bg-secondary">
+                            Completed: {{ batch.end_date.strftime('%Y-%m-%d') }}
+                        </span>
+                        {% else %}
+                        <span class="badge bg-success">
+                            Started: {{ batch.start_date.strftime('%Y-%m-%d') }}
+                        </span>
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
-            <div class="collapse {% if batch.id == expanded_batch %}show{% endif %}" id="batch{{ batch.id }}">
-                <div class="card-body">
-                    {% if batch.notes %}
-                    <div class="card-text">Batch Notes: {{ batch.notes|highlight(search_query) }}</div>
-                    {% endif %}
-                    {% if batch.status == 'In Progress' %}
-                    <form method="POST" action="{{ url_for('update_weight', batch_id=batch.id) }}">
-                        <div class="row">
-                            {% for tray in batch.trays %}
-                            <div class="card mb-3">
-                                <div class="card-header mb-2 bg-primary text-white">Tray {{ tray.position }}</div>
-                                <p class="card-text">
-                                    Contents: {{ tray.contents|highlight(search_query) }}<br>
-                                    Initial Weight: {{ tray.starting_weight }}g<br>
-                                    {% if tray.previous_weight %}
-                                    Previous Weight: {{ tray.previous_weight }}g<br>
-                                    {% endif %}
-                                    {% if tray.notes %}
-                                    Notes: {{ tray.notes|highlight(search_query) }}<br>
-                                    {% endif %}
-                                    <label class="form-label text-danger font-weight-bold">
-                                        Enter weight for tray {{ tray.position }} (g)
-                                    </label>
-                                    <input type="number" step="0.01" name="ending_weight_{{ tray.id }}"
-                                        class="form-control border-danger text-danger ending-weight"
-                                        data-tray-id="{{ tray.id }}" data-starting-weight="{{ tray.starting_weight }}"
-                                        data-previous-weight="{{ tray.previous_weight or tray.starting_weight }}"
-                                        required>
-                                <div class="mt-2 text-danger">
-                                    <strong>Percent Change:</strong>
-                                    <span id="percent-change-{{ tray.id }}">0%</span>
-                                </div>
-                                </p>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        <button type="submit" class="btn btn-primary">Update Weight</button>
-                        <button formaction="{{ url_for('complete_batch', id=batch.id) }}" type="submit"
-                            class="btn btn-success">
-                            Complete Batch
-                        </button>
-                    </form>
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function () {
-                            // Attach input event listener to all ending weight fields
-                            document.querySelectorAll('.ending-weight').forEach(function (input) {
-                                input.addEventListener('input', function () {
-                                    const trayId = this.getAttribute('data-tray-id');
-                                    const startingWeight = parseFloat(this.getAttribute('data-starting-weight'));
-                                    const previousWeight = parseFloat(this.getAttribute('data-previous-weight'));
-                                    const endingWeight = parseFloat(this.value);
-
-                                    if (!isNaN(startingWeight) && !isNaN(previousWeight) && !isNaN(endingWeight) && startingWeight > 0) {
-                                        const percentChange = (((previousWeight - endingWeight) / startingWeight) * 100).toFixed(2);
-                                        document.getElementById(`percent-change-${trayId}`).textContent = `${percentChange}%`;
-                                    } else {
-                                        document.getElementById(`percent-change-${trayId}`).textContent = '0%';
-                                    }
-                                });
-                            });
-                        });
-                    </script>
-                    {% else %}
-                    <div class="row">
-                        {% for tray in batch.trays %}
+                <div class="collapse {% if batch.id == expanded_batch %}show{% endif %}" id="batch{{ batch.id }}">
+                    <div class="card-body">
+                        {% if batch.notes %}
                         <div class="mb-3">
                             <div class="card border border-primary">
                                 <div class="card-body">
-                                    <div class="card-header mb-2 bg-primary text-white">Tray {{ tray.position }}</div>
+                                    <div class="card-header mb-2 bg-primary text-white">Batch Notes</div>
                                     <p class="card-text">
-                                        Contents: {{ tray.contents|highlight(search_query) }}<br>
-                                        Initial Weight: {{ tray.starting_weight }}g<br>
-                                        {% if tray.ending_weight %}
-                                        Final Weight: {{ tray.ending_weight }}g<br>
-                                        Weight Loss: {{ ((tray.starting_weight - tray.ending_weight) /
-                                        tray.starting_weight *
-                                        100)|round(1) }}%
-                                        {% endif %}
-                                        {% if tray.notes %}
-                                        <br>Notes: {{ tray.notes|highlight(search_query) }}
-                                        {% endif %}
+                                        {{ batch.notes|highlight(search_query) }}
                                     </p>
-                                    <a href="{{ url_for('edit_tray', id=tray.id, expanded_batch=tray.batch_id) }}"
-                                        class="btn btn-primary">Edit</a>
-                                    <a href="{{ url_for('add_bag', tray_id=tray.id, expanded_batch=tray.batch_id) }}"
-                                        class="btn btn-primary">Add
-                                        Bag</a>
                                 </div>
                             </div>
                         </div>
-                        {% endfor %}
-                    </div>
-
-                    <div class="row">
-                        {% for bag in batch.bags %}
-                        <div class="mb-3">
-                            <div class="card border border-success">
-                                <div class="card-body">
-                                    <div class="card-header mb-2 bg-success text-white">Bag: {{ bag.id }}</div>
-                                    <p class="card-text">
-                                        Date: {{ bag.created_date.strftime('%Y-%m-%d') }}<br>
-                                        Location: {{ bag.location }}<br>
-                                        {% if bag.consumed_date %}
-                                        Consumed: {{ bag.consumed_date.strftime('%Y-%m-%d') }}<br>
-                                        {% endif %}
-                                        Contents: {{ bag.contents|highlight(search_query) }}<br>
-                                        Weight: {{ bag.weight }} grams<br>
-                                        Water Removed: {{ bag.water_needed|round(1) }} ml<br>
-                                        {% if bag.notes %}
-                                        Notes: {{ bag.notes|highlight(search_query) }}<br>
-                                        {% endif %}
-                                    </p>
-                                    <div class="d-flex gap-2">
-                                        <a href="{{ url_for('print_label', id=bag.id) }}" class="btn btn-success"
-                                            target="_blank">
-                                            Print Label
-                                        </a>
-                                        {% if not bag.consumed_date %}
-                                        <form method="POST"
-                                            action="{{ url_for('consume_bag', id=bag.id, next=request.path + '?expanded_batch=' + (bag.batch_id | string)) }}"
-                                            style="display: inline;">
-                                            <button type="submit" class="btn btn-success">
-                                                Consume
-                                            </button>
-                                        </form>
-                                        {% endif %}
-                                        <a href="{{ url_for('edit_bag', id=bag.id, next=request.path + '?expanded_batch=' + (bag.batch_id | string)) }}"
-                                            class="btn btn-success">Edit</a>
+                        {% endif %}
+                        {% if batch.status == 'In Progress' %}
+                        <form method="POST" action="{{ url_for('update_weight', batch_id=batch.id) }}">
+                            <div class="row">
+                                {% for tray in batch.trays %}
+                                <div class="mb-3">
+                                    <div class="card border border-primary">
+                                        <div class="card-header mb-2 bg-primary text-white">Tray {{ tray.position }}
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="card-text">
+                                                Contents: {{ tray.contents|highlight(search_query) }}<br>
+                                                Initial Weight: {{ tray.starting_weight }}g<br>
+                                                {% if tray.previous_weight %}
+                                                Previous Weight: {{ tray.previous_weight }}g<br>
+                                                {% endif %}
+                                                {% if tray.notes %}
+                                                Notes: {{ tray.notes|highlight(search_query) }}<br>
+                                                {% endif %}
+                                            <div class="mb-3">
+                                                <div class="card border border-danger">
+                                                    <div class="card-body">
+                                                        <label class="form-label text-danger font-weight-bold">
+                                                            Enter weight for tray {{ tray.position }} (g)
+                                                        </label>
+                                                        <input type="number" step="0.01"
+                                                            name="ending_weight_{{ tray.id }}"
+                                                            class="form-control border-danger text-danger ending-weight"
+                                                            data-tray-id="{{ tray.id }}"
+                                                            data-starting-weight="{{ tray.starting_weight }}"
+                                                            data-previous-weight="{{ tray.previous_weight or tray.starting_weight }}"
+                                                            required>
+                                                        <div class="mt-2 text-danger">
+                                                            <strong>Percent Change:</strong>
+                                                            <span id="percent-change-{{ tray.id }}">0%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="mb-3">
+                                <button type="submit" class="btn btn-primary">Update Weight</button>
+                                <button formaction="{{ url_for('complete_batch', id=batch.id) }}" type="submit"
+                                    class="btn btn-success">
+                                    Complete Batch
+                                </button>
+                            </div>
+                        </form>
+                        {% else %}
+                        <div class="row">
+                            {% for tray in batch.trays %}
+                            <div class="mb-3">
+                                <div class="card border border-primary">
+                                    <div class="card-body">
+                                        <div class="card-header mb-2 bg-primary text-white">Tray {{ tray.position }}
+                                        </div>
+                                        <p class="card-text">
+                                            Contents: {{ tray.contents|highlight(search_query) }}<br>
+                                            Initial Weight: {{ tray.starting_weight }}g<br>
+                                            {% if tray.ending_weight %}
+                                            Final Weight: {{ tray.ending_weight }}g<br>
+                                            Weight Loss: {{ ((tray.starting_weight - tray.ending_weight) /
+                                            tray.starting_weight *
+                                            100)|round(1) }}%
+                                            {% endif %}
+                                            {% if tray.notes %}
+                                            <br>Notes: {{ tray.notes|highlight(search_query) }}
+                                            {% endif %}
+                                        </p>
+                                        <a href="{{ url_for('edit_tray', id=tray.id, expanded_batch=tray.batch_id) }}"
+                                            class="btn btn-primary">Edit</a>
+                                        <a href="{{ url_for('add_bag', tray_id=tray.id, expanded_batch=tray.batch_id) }}"
+                                            class="btn btn-primary">Add Bag</a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="row">
+                            {% for bag in batch.bags %}
+                            <div class="mb-3">
+                                <div class="card border border-success">
+                                    <div class="card-body">
+                                        <div class="card-header mb-2 bg-success text-white">Bag: {{ bag.id }}</div>
+                                        <p class="card-text">
+                                            Date: {{ bag.created_date.strftime('%Y-%m-%d') }}<br>
+                                            Location: {{ bag.location }}<br>
+                                            {% if bag.consumed_date %}
+                                            Consumed: {{ bag.consumed_date.strftime('%Y-%m-%d') }}<br>
+                                            {% endif %}
+                                            Contents: {{ bag.contents|highlight(search_query) }}<br>
+                                            Weight: {{ bag.weight }} grams<br>
+                                            Water Removed: {{ bag.water_needed|round(1) }} ml<br>
+                                            {% if bag.notes %}
+                                            Notes: {{ bag.notes|highlight(search_query) }}<br>
+                                            {% endif %}
+                                        </p>
+                                        <div class="d-flex gap-2">
+                                            <a href="{{ url_for('print_label', id=bag.id) }}" class="btn btn-success"
+                                                target="_blank">
+                                                Print Label
+                                            </a>
+                                            {% if not bag.consumed_date %}
+                                            <form method="POST"
+                                                action="{{ url_for('consume_bag', id=bag.id, next=request.path + '?expanded_batch=' + (bag.batch_id | string)) }}"
+                                                style="display: inline;">
+                                                <button type="submit" class="btn btn-success">
+                                                    Consume
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                            <a href="{{ url_for('edit_bag', id=bag.id, next=request.path + '?expanded_batch=' + (bag.batch_id | string)) }}"
+                                                class="btn btn-success">Edit</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% if batch.photos.all()|length > 0 %}
+                        <div class="row">
+                            <div class="mb-3">
+                                <div class="card border border-dark">
+                                    <div class="card-body">
+                                        <div class="card-header mb-2 bg-dark text-white">Photos</div>
+                                        {% for photo in batch.photos %}
+                                        <div class="mb-3">
+                                            <img src="{{ url_for('static', filename='uploads/' ~ photo.filename) }}"
+                                                class="img-thumbnail" alt="Photo for Batch {{ batch.id }}">
+                                        </div>
+                                        {% endfor %}
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        {% endfor %}
+                        {% endif %}
+                        <div class="card-footer">
+                            <a href="{{ url_for('edit_batch', id=batch.id, next=request.path + '?expanded_batch=' + (batch.id | string)) }}"
+                                class="btn btn-primary">
+                                Edit Batch
+                            </a>
+                            <a href="{{ url_for('add_photo', batch_id=batch.id) }}" class="btn btn-primary">
+                                Add Photo
+                            </a>
+                        </div>
                     </div>
-                    {% endif %}
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('edit_batch', id=batch.id, next=request.path + '?expanded_batch=' + (batch.id | string)) }}"
-                        class="btn btn-primary">
-                        Edit Batch
-                    </a>
                 </div>
             </div>
         </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-</div>
+    <div class="d-flex justify-content-center mt-4">
+        <nav aria-label="Page navigation">
+            <ul class="pagination">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('view_batches', page=pagination.prev_num) }}">Previous</a>
+                </li>
+                {% endif %}
+                {% for page in pagination.iter_pages() %}
+                {% if page %}
+                <li class="page-item {% if page == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('view_batches', page=page) }}">{{ page }}</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+                {% endfor %}
 
-<div class="d-flex justify-content-center mt-4">
-    <nav aria-label="Page navigation">
-        <ul class="pagination">
-            {% if pagination.has_prev %}
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for('view_batches', page=pagination.prev_num) }}">Previous</a>
-            </li>
-            {% endif %}
-            {% for page in pagination.iter_pages() %}
-            {% if page %}
-            <li class="page-item {% if page == pagination.page %}active{% endif %}">
-                <a class="page-link" href="{{ url_for('view_batches', page=page) }}">{{ page }}</a>
-            </li>
-            {% else %}
-            <li class="page-item disabled"><span class="page-link">...</span></li>
-            {% endif %}
-            {% endfor %}
+                {% if pagination.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('view_batches', page=pagination.next_num) }}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Attach input event listener to all ending weight fields
+            document.querySelectorAll('.ending-weight').forEach(function (input) {
+                input.addEventListener('input', function () {
+                    const trayId = this.getAttribute('data-tray-id');
+                    const startingWeight = parseFloat(this.getAttribute('data-starting-weight'));
+                    const previousWeight = parseFloat(this.getAttribute('data-previous-weight'));
+                    const endingWeight = parseFloat(this.value);
 
-            {% if pagination.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for('view_batches', page=pagination.next_num) }}">Next</a>
-            </li>
-            {% endif %}
-        </ul>
-    </nav>
-</div>
-{% endblock %}
+                    if (!isNaN(startingWeight) && !isNaN(previousWeight) && !isNaN(endingWeight) && startingWeight > 0) {
+                        const percentChange = (((previousWeight - endingWeight) / startingWeight) * 100).toFixed(2);
+                        document.getElementById(`percent-change-${trayId}`).textContent = `${percentChange}%`;
+                    } else {
+                        document.getElementById(`percent-change-${trayId}`).textContent = '0%';
+                    }
+                });
+            });
+        });
+    </script>
+    {% endblock %}

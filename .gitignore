@@ -2,3 +2,5 @@
 __pycache__
 instance/
 wsgi.py
+static/uploads/
+shell.nix
