@@ -9,7 +9,8 @@ A web application for tracking freeze-dried food batches. This tool allows you t
   - Record trays in each batch with contents and weights.
   - Calculate water removed during freeze-drying.
   - Mark batches as complete when weights are stable.
-
+  - Attach photos and notes to each batch
+    
 - **Tray Management**:
   - Add trays to batches with detailed information.
   - Update tray weights to track progress.
