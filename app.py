@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file
+from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from io import BytesIO
@@ -356,7 +356,8 @@ def print_label(id):
         rightMargin=MARGIN,
         leftMargin=MARGIN,
         topMargin=MARGIN,  # Leave space at the bottom for the footer
-        bottomMargin=2 * inch  # QR code and URL will fit here
+        bottomMargin=2 * inch,  # QR code and URL will fit here
+	title="Freeze Dry Tracker"
     )
 
     # Create styles
@@ -550,6 +551,15 @@ def view_bags():
         search_query=search_query,
         unopened=unopened
     )
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(
+        directory='static',
+        path='freezedryer.svg',
+        mimetype='image/svg+xml'
+    )
+
 
 if __name__ == '__main__':
     with app.app_context():
