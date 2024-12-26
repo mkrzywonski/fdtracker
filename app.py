@@ -115,6 +115,7 @@ class Photo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     batch_id = db.Column(db.Integer, db.ForeignKey('batch.id', ondelete='CASCADE'), nullable=False, index=True)
     filename = db.Column(db.String(255), nullable=False)
+    caption = db.Column(db.Text)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 @app.route('/')
@@ -218,7 +219,7 @@ def add_batch():
             batch.trays.append(tray)
 
         db.session.commit()
-        return redirect(url_for('view_batches'))
+        return redirect(url_for('view_batches', expanded_batch=batch.id))
 
     # Default state for a new form
     return render_template('add_batch.html', tray_count=1, trays=[], batch_notes='')
@@ -263,6 +264,13 @@ def complete_batch(id):
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete_batch(id):
     batch = Batch.query.get_or_404(id)
+    
+    # Delete all photo files associated with this batch
+    for photo in batch.photos:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], photo.filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    
     db.session.delete(batch)
     db.session.commit()
     return redirect(url_for('view_batches'))
@@ -617,10 +625,12 @@ def add_photo(batch_id):
             return render_template('add_photo.html', batch=batch, error="No file part")
 
         file = request.files['photo']
+        caption = request.form.get('caption', '')
+        
         if file.filename == '':
             return render_template('add_photo.html', batch=batch, error="No selected file")
         if file and allowed_file(file.filename):
-            photo = Photo(batch_id=batch_id, filename='temp')
+            photo = Photo(batch_id=batch_id, filename='temp', caption=caption)
             db.session.add(photo)
             db.session.flush()
 
@@ -635,7 +645,6 @@ def add_photo(batch_id):
             db.session.commit()
             return redirect(url_for('view_batches', expanded_batch=batch_id))
     
-    # Add this return statement for GET requests
     return render_template('add_photo.html', batch=batch)
 
 if __name__ == '__main__':

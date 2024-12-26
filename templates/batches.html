@@ -180,9 +180,16 @@
                                     <div class="card-body">
                                         <div class="card-header mb-2 bg-dark text-white">Photos</div>
                                         {% for photo in batch.photos %}
-                                        <div class="mb-3">
-                                            <img src="{{ url_for('static', filename='uploads/' ~ photo.filename) }}"
-                                                class="img-thumbnail" alt="Photo for Batch {{ batch.id }}">
+                                        <div class="mb-3 text-center card border border-dark">
+                                            <div class="card-body">
+                                                <img src="{{ url_for('static', filename='uploads/' ~ photo.filename) }}"
+                                                    class="img-thumbnail" alt="Photo for Batch {{ batch.id }}">
+                                                {% if photo.caption %}
+                                                <div class="text-center mt-2">
+                                                    <em>{{ photo.caption }}</em>
+                                                </div>
+                                            </div>
+                                            {% endif %}
                                         </div>
                                         {% endfor %}
                                     </div>
