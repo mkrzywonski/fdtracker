@@ -453,6 +453,12 @@ def edit_batch(id):
             bag = Bag.query.get(bag_id)
             db.session.delete(bag)
 
+        # Photo Captions
+        for photo in batch.photos:
+            caption_key = f'caption-{photo.id}'
+            if caption_key in request.form:
+                photo.caption = request.form[caption_key]
+
         # Deleting Photos
         photos_to_delete = request.form.getlist('delete_photo')
         for photo_id in photos_to_delete:

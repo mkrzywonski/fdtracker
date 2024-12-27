@@ -84,7 +84,7 @@
                          class="img-thumbnail me-3" 
                          style="max-width: 100px; max-height: 100px;" 
                          alt="Photo thumbnail">
-                    <span>{{ photo.filename }}</span>
+                    <textarea class="form-control" id="caption-{{ photo.id }}" name="caption-{{ photo.id }}" rows="1">{{ photo.caption }}</textarea>
                 </div>
                 <div>
                     <label>
