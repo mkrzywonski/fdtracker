@@ -357,7 +357,7 @@ def print_label(id):
 
     # Function to draw footer (QR code and URL) on every page
     def draw_footer(canvas, doc):
-        qr_img = RLImage(qr_buffer, width=1.5 * inch, height=1.5 * inch)
+        qr_img = RLImage(qr_buffer, width=1.0 * inch, height=1.0 * inch)
         qr_x = (PAGE_WIDTH - qr_img.drawWidth) / 2
         qr_y = 0.25 * inch
         qr_img.drawOn(canvas, qr_x, qr_y)
@@ -391,7 +391,7 @@ def print_label(id):
         'CustomTitle',
         parent=styles['Heading1'],
         fontSize=16,
-        spaceAfter=10
+        alignment=1
     )
     normal_style = ParagraphStyle(
         'CustomBody',
@@ -402,10 +402,12 @@ def print_label(id):
 
     # Build content elements
     elements = []
-    elements.append(Paragraph(f"Bag #{bag.id} {bag.created_date.strftime('%Y-%m-%d')}", title_style))
-    elements.append(Paragraph(f"Contents: {bag.contents}", normal_style))
-    elements.append(Paragraph(f"Weight: {bag.weight}g", normal_style))
-    elements.append(Paragraph(f"Water Needed: {bag.water_needed:.1f}g", normal_style))
+    elements.append(Paragraph(f"{bag.contents}", title_style))
+    elements.append(Paragraph(f"Bag: {bag.id}", normal_style))
+    elements.append(Paragraph(f"Batch: {bag.batch.id:08d}", normal_style))
+    elements.append(Paragraph(f"Batch Date: {bag.batch.start_date.strftime('%Y-%m-%d')}", normal_style))
+    elements.append(Paragraph(f"Bag Weight: {bag.weight}g", normal_style))
+    elements.append(Paragraph(f"Water Needed: ~{bag.water_needed:.1f} ml", normal_style))
     if bag.location:
         elements.append(Paragraph(f"Location: {bag.location}", normal_style))
     if bag.notes:
