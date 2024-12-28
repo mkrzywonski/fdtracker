@@ -16,9 +16,46 @@
         <input type="text" name="location" class="form-control" required>
     </div>
     <div class="mb-3">
-        <label class="form-label">Notes</label>
+        <div class="d-flex align-items-center justify-content-between">
+            <label class="form-label">Notes</label>
+            <select class="form-select" style="width: auto;">
+                <option value="type">Type notes for this bag</option>
+                <option value="batch" {% if not tray.batch.notes %}disabled{% endif %}>Copy Batch Notes</option>
+                <option value="tray" {% if not tray.notes %}disabled{% endif %}>Copy Tray Notes</option>
+            </select>
+        </div>
         <textarea name="notes" class="form-control" rows="3"></textarea>
     </div>
     <button type="submit" class="btn btn-primary">Save Bag</button>
+    <a href="{{ url_for('view_batches', expanded_batch=tray.batch.id) }}" class="btn btn-secondary">Cancel</a>
 </form>
+<script>
+    let saved_notes = '';  // Store the user's input when switching away from 'type'
+    let batch_notes = '{{ tray.batch.notes }}';  // Batch notes from the server-side
+    let tray_notes = '{{ tray.notes }}';  // Tray notes from the server-side
+
+    // Function to handle the note selection change
+    function handleNotesChange(value) {
+        const notesTextarea = document.querySelector('textarea[name="notes"]');  // Reference the textarea
+        
+        if (value === 'type') {
+            notesTextarea.value = saved_notes;  // Restore saved notes when switching back to 'Enter Text'
+        } else if (value === 'batch') {
+            notesTextarea.value = batch_notes;  // Set batch notes
+        } else if (value === 'tray') {
+            notesTextarea.value = tray_notes;  // Set tray notes
+        }
+    }
+
+    // Set up the event listener for the 'select' element
+    document.querySelector('select').addEventListener('change', function(event) {
+        handleNotesChange(event.target.value);  // Call function on change
+    });
+
+    // Automatically save typed text when the user types in the textarea
+    document.querySelector('textarea[name="notes"]').addEventListener('input', function() {
+        saved_notes = this.value;  // Save the current text whenever the user types
+    });
+</script>
+
 {% endblock %}
