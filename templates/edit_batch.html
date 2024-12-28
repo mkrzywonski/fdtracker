@@ -81,7 +81,8 @@
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
                     <img src="{{ url_for('static', filename='uploads/' + photo.filename) }}" class="img-thumbnail me-3"
-                        style="max-width: 100px; max-height: 100px;" alt="Photo thumbnail">
+                        style="max-width: 100px; max-height: 100px;" alt="Photo thumbnail"
+                        onerror="this.outerHTML='<i class=\'bi bi-image text-muted me-3\' style=\'font-size: 100px; width: 100px;\'></i>'; this.parentElement.parentElement.querySelector('input[type=checkbox]').checked = true;">
                     <textarea class="form-control" id="caption-{{ photo.id }}" name="caption-{{ photo.id }}"
                         rows="1">{{ photo.caption }}</textarea>
                 </div>

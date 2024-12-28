@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Restore Backup</h2>
+
+    {% if error %}
+    <div class="alert alert-danger">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="backup_file" class="btn btn-primary">Select Backup File (.zip)</label>
+                    <input class="form-control form-control-sm" type="file" id="backup_file" name="backup_file"
+                        accept=".zip" style="display: none;" required onchange="enableUpload(this)">
+                    <div id="filename" class="mt-2 text-muted border">No file selected</div>
+                </div>
+                <div class="alert alert-warning">
+                    Warning: This will replace all current data with the backup data.
+                </div>
+                <button type="submit" id="upload-button" class="btn btn-secondary" disabled>Restore Backup</button>
+                <a href="{{ url_for('view_batches') }}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    function enableUpload(input) {
+        const uploadButton = document.getElementById('upload-button');
+        const filenameDiv = document.getElementById('filename');
+
+        if (input.files && input.files[0]) {
+            // Show filename
+            filenameDiv.textContent = input.files[0].name;
+            // Enable the upload button
+            uploadButton.classList.remove('btn-secondary');
+            uploadButton.classList.add('btn-primary');
+            uploadButton.disabled = false;
+        } else {
+            // Reset the preview and disable the upload button
+            filenameDiv.textContent = '';
+            uploadButton.classList.remove('btn-primary');
+            uploadButton.classList.add('btn-secondary');
+            uploadButton.disabled = true;
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,119 @@
+body {
+    font-size: 1.4rem;
+}
+
+.navbar-brand {
+    font-size: 3.0rem !important;
+}
+
+.nav-link {
+    font-size: 2.8rem !important;
+}
+
+.dropdown-item {
+    font-size: 2.8rem !important;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.container {
+    font-size: 2.0rem;
+}
+
+.badge {
+    font-size: 2.0rem;
+}
+
+.form-label {
+    font-size: 2.5rem;
+}
+
+.form-control {
+    font-size: 2.5rem;
+}
+
+.form-select {
+    font-size: 2.2rem;
+}
+
+.form-title {
+    font-size: 2.8rem !important;
+}
+
+.card-title {
+    font-size: 2.6rem !important;
+}
+
+.card-header {
+    font-size: 2.6rem !important;
+}
+
+.batch-name {
+    font-size: 2.4rem !important;
+}
+
+.card {
+    border: 5px;
+}
+
+.card-text {
+    font-size: 2.2rem;
+}
+
+.card-body {
+    font-size: 2.2rem;
+}
+
+.btn {
+    font-size: 2.4rem;
+}
+
+.checkbox {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    border: 3px solid black;
+}
+
+.checkbox-label {
+    font-size: 2.4rem;
+}
+
+mark {
+    padding: 0;
+    margin: 0;
+    line-height: inherit;
+    font-weight: inherit;
+    background-color: rgb(255, 242, 0);
+    color: black;
+}
+
+input.form-control,
+select.form-control,
+textarea.form-control {
+    border-width: 2px;
+    border-color: #000000;
+}
+
+input.form-control:focus,
+select.form-control:focus,
+textarea.form-control:focus {
+    border-width: 3px;
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+img#preview {
+    max-width: 100%;
+    height: auto;
+}
+
+.navbar-toggler {
+    padding: 0.75rem;  /* Increase padding around the icon */
+    margin: 0.75rem;    /* Add some margin for spacing */
+}
+
+.navbar-toggler-icon {
+    width: 3em;        /* Make the icon larger */
+    height: 3em;       /* Make the icon larger */
+}

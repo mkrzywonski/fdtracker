@@ -5,6 +5,10 @@ from datetime import datetime
 from io import BytesIO
 from urllib.parse import urlparse
 import configparser
+from zipfile import ZipFile, BadZipFile
+import shutil
+import hashlib
+import json
 
 # Third-party imports
 from flask import (
@@ -670,11 +674,171 @@ def water_volume_imperial(grams):
     quarts = cups / 4  # 4 cups = 1 quart
     return f"{quarts:.1f}qt"
 
-
 def water_volume_metric(grams):
     if grams >= 1000:
         return f"{grams/1000:.1f}L"
     return f"{grams:.0f}ml"
+
+def calculate_backup_hash(db_path, jpg_files):
+    """Calculate a hash of the database and jpg files"""
+    hasher = hashlib.sha256()
+    
+    # Hash database content
+    with open(db_path, 'rb') as f:
+        hasher.update(f.read())
+        
+    # Hash jpg files in sorted order for consistency
+    for jpg_file in sorted(jpg_files):
+        with open(jpg_file, 'rb') as f:
+            hasher.update(f.read())
+            
+    return hasher.hexdigest()
+
+@app.route('/backup')
+def create_backup():
+    db_path = os.path.join(app.instance_path, 'freezedry.db')
+    
+    # Quiesce database
+    db.session.commit()
+    db.session.remove()
+    db.engine.dispose()
+    
+    # Get list of jpg files
+    jpg_files = []
+    for root, _, files in os.walk(UPLOAD_FOLDER):
+        for file in files:
+            if file.lower().endswith('.jpg'):
+                jpg_files.append(os.path.join(root, file))
+                
+    # Calculate hash
+    backup_hash = calculate_backup_hash(db_path, jpg_files)
+    
+    # Create backup with manifest
+    backup = BytesIO()
+    with ZipFile(backup, 'w') as zip_file:
+        # Add database
+        zip_file.write(db_path, 'freezedry.db')
+        
+        # Add jpg files
+        for file_path in jpg_files:
+            arcname = os.path.relpath(file_path, start='.')
+            zip_file.write(file_path, arcname)
+            
+        # Add manifest with hash
+        manifest = {
+            'hash': backup_hash,
+            'timestamp': datetime.now().isoformat()
+        }
+        zip_file.writestr('manifest.json', json.dumps(manifest))
+    
+    backup.seek(0)
+    return send_file(
+        backup,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f'fdtracker_backup_{datetime.now().strftime("%Y%m%d")}.zip'
+    )
+
+import magic  # For file type detection
+
+def validate_backup_contents(zip_file):
+    """Validate all files in the backup archive"""
+    valid_files = {'freezedry.db', 'manifest.json'}
+    uploads_prefix = 'static/uploads/'
+    
+    # Check that all required files exist
+    found_files = set(name for name in zip_file.namelist() if '/' not in name)
+    missing_files = valid_files - found_files
+    if missing_files:
+        return False, f"Missing required files: {', '.join(missing_files)}"
+    
+    # Validate each file
+    for file_path in zip_file.namelist():
+        if file_path == 'freezedry.db':
+            content = zip_file.read(file_path)
+            mime = magic.from_buffer(content, mime=True)
+            if mime != 'application/x-sqlite3':
+                return False, "Invalid database file format"
+                
+        elif file_path == 'manifest.json':
+            continue
+            
+        elif file_path.startswith(uploads_prefix) and file_path.lower().endswith('.jpg'):
+            content = zip_file.read(file_path)
+            mime = magic.from_buffer(content, mime=True)
+            if mime not in ('image/jpeg', 'image/jpg'):
+                return False, f"Invalid image format: {file_path}"
+                
+        else:
+            return False, f"Unexpected file in backup: {file_path}"
+            
+    return True, None
+
+
+@app.route('/restore', methods=['GET', 'POST'])
+def restore_backup():
+    if request.method == 'GET':
+        return render_template('restore_backup.html')
+        
+    if 'backup_file' not in request.files:
+        return render_template('restore_backup.html', error="No backup file provided")
+        
+    backup = request.files['backup_file']
+    
+    if backup.filename == '':
+        return render_template('restore_backup.html', error="No file selected")
+
+    try:
+        with ZipFile(backup, 'r') as zip_file:
+            # Validate all files before extraction
+            is_valid, error_msg = validate_backup_contents(zip_file)
+            if not is_valid:
+                return render_template('restore_backup.html', error=error_msg)
+                
+            # Extract to temp directory for hash validation
+            zip_file.extractall('restore_temp')
+            
+            # Read manifest
+            with open('restore_temp/manifest.json') as f:
+                manifest = json.load(f)
+                
+            # Get jpg files
+            jpg_files = []
+            for root, _, files in os.walk('restore_temp/static/uploads'):
+                for file in files:
+                    if file.lower().endswith('.jpg'):
+                        jpg_files.append(os.path.join(root, file))
+                        
+            # Verify hash
+            current_hash = calculate_backup_hash(
+                'restore_temp/freezedry.db',
+                jpg_files
+            )
+            if current_hash != manifest['hash']:
+                return render_template('restore_backup.html',
+                    error="Invalid backup: File verification failed")
+                
+            # Close database connections
+            db.session.remove()
+            db.engine.dispose()
+            
+            # Restore files
+            db_path = os.path.join(app.instance_path, 'freezedry.db')
+            shutil.copy2('restore_temp/freezedry.db', db_path)
+            shutil.rmtree(UPLOAD_FOLDER)
+            shutil.copytree('restore_temp/static/uploads', UPLOAD_FOLDER)
+            
+    except (BadZipFile, json.JSONDecodeError, KeyError):
+        return render_template('restore_backup.html',
+            error="Invalid backup file format")
+    finally:
+        shutil.rmtree('restore_temp', ignore_errors=True)
+    
+    # Reconnect to database
+    db.create_all()
+    
+    return redirect(url_for('view_batches'))
+
 
 
 if __name__ == '__main__':
