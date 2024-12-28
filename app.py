@@ -618,7 +618,7 @@ def print_label(id):
     # Fixed details
     c.drawString(x, y, f"Bag ID: {bag.id}")
     y -= 15
-    c.drawString(x, y, f"Weight: {bag.weight}g")
+    c.drawString(x, y, f"Freeze Dried Weight: {bag.weight}g")
     y -= 15
     original_weight = round(bag.weight + bag.water_needed, 1)
     c.drawString(x, y, f"Original Weight: ~{original_weight}g")
