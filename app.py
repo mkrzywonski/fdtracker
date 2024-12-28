@@ -1,20 +1,34 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory
-from flask_sqlalchemy import SQLAlchemy
+# Standard library imports
+import os
+import re
 from datetime import datetime
 from io import BytesIO
-import qrcode
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Image as RLImage
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from markupsafe import Markup
-import re
-from sqlalchemy import or_
-import configparser
-from werkzeug.middleware.proxy_fix import ProxyFix
 from urllib.parse import urlparse
-import os
+import configparser
+
+# Third-party imports
+from flask import (
+    Flask, 
+    render_template, 
+    request, 
+    redirect, 
+    url_for, 
+    send_file, 
+    send_from_directory
+)
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
+from sqlalchemy import or_
+from markupsafe import Markup
+import qrcode
 from PIL import Image
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import inch
+from reportlab.lib.utils import ImageReader, simpleSplit
+
+
 
 # Read the configuration file
 config = configparser.ConfigParser()
@@ -329,111 +343,6 @@ def consume_bag(id):
         return redirect(next_url)
     return redirect(url_for('view_batches', expanded_batch=bag.batch_id))
 
-@app.route('/print_label/<string:id>')
-def print_label(id):
-    bag = Bag.query.get_or_404(id)
-
-    # Create QR code with batch URL
-    batch_url = url_for('view_bags', expanded_bag=bag.id, _external=True)
-    qr = qrcode.QRCode(version=1, box_size=10, border=4)
-    qr.add_data(batch_url)
-    qr.make(fit=True)
-    qr_img = qr.make_image(fill_color="black", back_color="white")
-
-    # Save QR code to memory
-    qr_buffer = BytesIO()
-    qr_img.save(qr_buffer)
-    qr_buffer.seek(0)
-
-    # Create PDF in memory
-    buffer = BytesIO()
-
-    # Page setup
-    from reportlab.platypus import Frame, PageTemplate
-    from reportlab.lib.pagesizes import inch
-
-    PAGE_WIDTH, PAGE_HEIGHT = 4 * inch, 6 * inch
-    MARGIN = 0.25 * inch
-
-    # Function to draw footer (QR code and URL) on every page
-    def draw_footer(canvas, doc):
-        qr_img = RLImage(qr_buffer, width=1.0 * inch, height=1.0 * inch)
-        qr_x = (PAGE_WIDTH - qr_img.drawWidth) / 2
-        qr_y = 0.25 * inch
-        qr_img.drawOn(canvas, qr_x, qr_y)
-
-        url_style = ParagraphStyle(
-            'URL',
-            fontSize=8,
-            alignment=1  # Center alignment
-        )
-        url_paragraph = Paragraph(batch_url, url_style)
-        url_width, url_height = url_paragraph.wrap(PAGE_WIDTH - 2 * MARGIN, 0)
-        url_x = (PAGE_WIDTH - url_width) / 2
-        canvas.saveState()
-        url_paragraph.drawOn(canvas, url_x, qr_y - url_height)  # Position below QR code
-        canvas.restoreState()
-
-    # Set up the document
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=(PAGE_WIDTH, PAGE_HEIGHT),
-        rightMargin=MARGIN,
-        leftMargin=MARGIN,
-        topMargin=MARGIN,  # Leave space at the bottom for the footer
-        bottomMargin=2 * inch,  # QR code and URL will fit here
-	title="Freeze Dry Tracker"
-    )
-
-    # Create styles
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=16,
-        alignment=1
-    )
-    normal_style = ParagraphStyle(
-        'CustomBody',
-        parent=styles['Normal'],
-        fontSize=14,
-        leading=16
-    )
-
-    # Build content elements
-    elements = []
-    elements.append(Paragraph(f"{bag.contents}", title_style))
-    elements.append(Paragraph(f"Bag: {bag.id}", normal_style))
-    elements.append(Paragraph(f"Batch: {bag.batch.id:08d}", normal_style))
-    elements.append(Paragraph(f"Batch Date: {bag.batch.start_date.strftime('%Y-%m-%d')}", normal_style))
-    elements.append(Paragraph(f"Bag Weight: {bag.weight}g", normal_style))
-    elements.append(Paragraph(f"Water Needed: ~{bag.water_needed:.1f} ml", normal_style))
-    if bag.location:
-        elements.append(Paragraph(f"Location: {bag.location}", normal_style))
-    if bag.notes:
-        elements.append(Paragraph(f"Notes: {bag.notes}", normal_style))
-
-    # Set up a page template with the footer
-    doc.addPageTemplates(
-        PageTemplate(
-            frames=[
-                Frame(MARGIN, MARGIN, PAGE_WIDTH - 2 * MARGIN, PAGE_HEIGHT - 0.5 * inch)
-            ],
-            onPage=draw_footer  # Call the footer drawing function on every page
-        )
-    )
-
-    # Generate the PDF
-    doc.build(elements)
-    buffer.seek(0)
-
-    return send_file(
-        buffer,
-        download_name=f'bag_{bag.id}_label.pdf',
-        mimetype='application/pdf'
-    )
-
-
 @app.route('/edit_batch/<int:id>', methods=['GET', 'POST'])
 def edit_batch(id):
     batch = Batch.query.get_or_404(id)
@@ -654,6 +563,119 @@ def add_photo(batch_id):
             return redirect(url_for('view_batches', expanded_batch=batch_id))
     
     return render_template('add_photo.html', batch=batch)
+
+@app.route('/print_label/<string:id>')
+def print_label(id):
+    bag = Bag.query.get_or_404(id)
+
+    # Create QR code with batch URL
+    batch_url = url_for('view_bags', expanded_bag=bag.id, _external=True)
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data(batch_url)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+
+    # Save QR code to memory
+    qr_buffer = BytesIO()
+    qr_img.save(qr_buffer)
+    qr_buffer.seek(0)
+
+    # Create PDF in memory
+    buffer = BytesIO()
+
+    # Create the PDF canvas
+    c = canvas.Canvas(buffer, pagesize=(4*inch, 6*inch))
+    
+    # Draw the border and line
+    c.setStrokeColor(colors.black)
+    c.setLineWidth(0.02 * inch)
+    c.roundRect(0.1 * inch, 0.1 * inch, 3.8 * inch, 5.8 * inch, 0.25 * inch)
+    c.line(0.1 * inch, 5.4 * inch, 3.9 * inch, 5.4 * inch)
+    
+    # Add batch ID and date text
+    c.setFont('Helvetica-Bold', 12)
+    c.drawString(0.2 * inch, 5.6 * inch, f"Batch: {bag.batch_id:08d}")
+    date_text = bag.batch.start_date.strftime('%Y-%m-%d')
+    c.drawRightString(3.8 * inch, 5.6 * inch, date_text)
+    
+    # Add centered contents with text wrapping
+    from reportlab.lib.utils import simpleSplit
+    c.setFont('Helvetica-Bold', 14)
+    text_width = 3.6 * inch  # Allowing for margins
+    wrapped_lines = simpleSplit(bag.contents, c._fontname, c._fontsize, text_width)
+    y = 5.0 * inch  # 1 inch from top
+    for line in wrapped_lines:
+        text_length = c.stringWidth(line)
+        x = (4 * inch - text_length) / 2  # Center the text
+        c.drawString(x, y, line)
+        y -= 20  # Move down for next line
+
+    # Add details below contents
+    y -= 10  # Extra space after contents
+    c.setFont('Helvetica', 12)  # Switch to normal weight
+    x = 0.2 * inch  # Left margin
+    
+    # Fixed details
+    c.drawString(x, y, f"Bag ID: {bag.id}")
+    y -= 15
+    c.drawString(x, y, f"Weight: {bag.weight}g")
+    y -= 15
+    original_weight = round(bag.weight + bag.water_needed, 1)
+    c.drawString(x, y, f"Original Weight: ~{original_weight}g")
+    y -= 15
+    w = bag.water_needed
+    water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
+    c.drawString(x, y, f"Water Needed: ~{water_needed}")
+    y -= 15
+
+    # Wrapping text for location
+    if bag.location:
+        wrapped_location = simpleSplit(f"Location: {bag.location}", c._fontname, c._fontsize, text_width)
+        for line in wrapped_location:
+            c.drawString(x, y, line)
+            y -= 15
+
+    # Wrapping text for notes
+    if bag.notes:
+        y -= 10  # Extra space before notes
+        wrapped_notes = simpleSplit(f"{bag.notes}", c._fontname, c._fontsize, text_width)
+        for line in wrapped_notes:
+            c.drawString(x, y, line)
+            y -= 15
+
+    # Add QR code at bottom
+    qr_width = qr_height = 1 * inch
+    qr_x = (4 * inch - qr_width) / 2  # Center horizontally
+    qr_y = 0.2 * inch  # Position from bottom
+    c.drawImage(ImageReader(qr_buffer), qr_x, qr_y, qr_width, qr_height)
+    
+    c.save()
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        download_name=f'bag_{bag.id}_label.pdf',
+        mimetype='application/pdf'
+    )
+
+def water_volume_imperial(grams):
+    ounces = grams / 29.5735  # 1 fl oz = 29.5735g water
+    if ounces < 8:
+        return f"{ounces:.1f}oz"
+        
+    cups = ounces / 8  # 8 fl oz = 1 cup
+    if cups < 4:
+        return f"{cups:.1f}cup"
+        
+    quarts = cups / 4  # 4 cups = 1 quart
+    return f"{quarts:.1f}qt"
+
+
+def water_volume_metric(grams):
+    if grams >= 1000:
+        return f"{grams/1000:.1f}L"
+    return f"{grams:.0f}ml"
+
 
 if __name__ == '__main__':
     with app.app_context():
