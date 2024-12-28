@@ -80,11 +80,10 @@
             {% for photo in batch.photos %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
-                    <img src="{{ url_for('static', filename='uploads/' + photo.filename) }}" 
-                         class="img-thumbnail me-3" 
-                         style="max-width: 100px; max-height: 100px;" 
-                         alt="Photo thumbnail">
-                    <textarea class="form-control" id="caption-{{ photo.id }}" name="caption-{{ photo.id }}" rows="1">{{ photo.caption }}</textarea>
+                    <img src="{{ url_for('static', filename='uploads/' + photo.filename) }}" class="img-thumbnail me-3"
+                        style="max-width: 100px; max-height: 100px;" alt="Photo thumbnail">
+                    <textarea class="form-control" id="caption-{{ photo.id }}" name="caption-{{ photo.id }}"
+                        rows="1">{{ photo.caption }}</textarea>
                 </div>
                 <div>
                     <label>
@@ -99,8 +98,17 @@
 <a href="{{ url_for('view_batches', expanded_batch=batch.id) }}" class="btn btn-secondary">Cancel</a>
 </form>
 
-<form method="POST" action="{{ url_for('delete_batch', id=batch.id) }}"
-    onsubmit="return confirm('Are you sure you want to delete this batch? This action cannot be undone.');">
-    <br><button type="submit" class="btn btn-danger">Delete Batch</button>
-</form>
+<!-- Delete Bag Card -->
+<div class="card border border-danger mt-4 mb-4">
+    <div class="card-header bg-danger text-white">
+        Delete Batch
+    </div>
+    <div class="card-body">
+        <p class="card-text">Deleting this batch will remove all associated data. This action cannot be undone.</p>
+        <form method="POST" action="{{ url_for('delete_batch', id=batch.id) }}"
+            onsubmit="return confirm('Are you sure you want to delete this batch? This action cannot be undone.');">
+            <button type="submit" class="btn btn-danger">Delete Batch</button>
+        </form>
+    </div>
+</div>
 {% endblock %}
