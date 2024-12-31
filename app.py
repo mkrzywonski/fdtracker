@@ -197,9 +197,7 @@ def complete_batch(id):
                 )
             elif ending_weight > tray.starting_weight:
                 error_messages.append(
-                    f"Tray {
-                        tray.position}: Final weight cannot exceed the initial weight."
-                )
+                    f"Tray {tray.position}: Final weight cannot exceed the initial weight.")
         except (ValueError, TypeError):
             error_messages.append(
                 f"Tray {tray.position}: Final weight must be a valid number."
