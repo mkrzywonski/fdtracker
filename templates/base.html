@@ -1,3 +1,4 @@
+{% from 'macros.html' import freezedryer_icon %}
 <!DOCTYPE html>
 <html>
 
@@ -11,11 +12,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 
 </head>
+
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
             <!-- Navbar brand aligned to the left -->
-            <a class="navbar-brand" href="/">Freeze Dry Tracker</a>
+            <div id="page_title" class="navbar-brand">Freeze Dry Tracker</div>
 
             <!-- Toggler for smaller screens -->
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
@@ -26,24 +28,30 @@
             <!-- Navigation menu -->
             <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                 <ul class="navbar-nav flex-column align-items-end">
+                    <!-- View menu -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="settingsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle" href="#" id="viewDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-card-list"></i> View</a>
-                        <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="settingsDropdown">
+                        <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="viewDropdown">
                             <li>
-                                <a class="dropdown-item" href="{{ url_for('view_batches') }}">
-                                    <img src="static/freezedryer.svg" class="pe-1" alt="" width="48" height="48">
-                                    Batches</a>
+                                <a class="dropdown-item" href="{{ url_for('list_batches') }}">
+                                    {{ freezedryer_icon() }}
+                                    Batches
+                                </a>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="{{ url_for('view_bags') }}">
-                                <i class="bi bi-bag me-3"></i>Bags</a>
+                                <a class="dropdown-item" href="{{ url_for('list_bags') }}">
+                                    <i class="bi bi-bag me-3"></i>Bags</a>
                             </li>
                         </ul>
-                    </li>                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="settingsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    </li>
+                    <!-- Tools menu -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="toolsDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-tools"></i> Tools</a>
-                        <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="settingsDropdown">
+                        <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="toolsDropdown">
                             <li>
                                 <a class="dropdown-item" href="{{ url_for('create_backup') }}">
                                     <i class="bi bi-download"></i> Download Backup
@@ -56,16 +64,15 @@
                             </li>
                         </ul>
                     </li>
+                    </li>
                 </ul>
             </div>
-            
         </div>
     </nav>
     <div class="container-fluid mt-4">
         {% block content %}{% endblock %}
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
-
-
 </html>

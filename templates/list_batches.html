@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% from 'macros.html' import freezedryer_icon %}
+
+{% block content %}
+
+{# Set the page title #}
+<script>
+    document.getElementById('page_title').textContent = 'Batches';
+</script>
+
+{# Page container #}
+<div class="container-fluid mt-4">
+
+    {# Page Form #}
+    <form class="d-flex flex-column gap-3" method="POST" action="{{ url_for('list_batches') }}">
+        <input type="number" id="page" name="page" value="{{ page|default(1) }}" hidden>
+
+        {# Search Card #}
+        <div class="card border border-dark">
+            {# Search Card Header #}
+            <div class="card-header d-flex justify-content-between align-items-center bg-dark" role="button"
+                data-bs-toggle="collapse" data-bs-target="#searchCollapse" aria-expanded="false">
+                <span>
+                    <i id="search_arrow" class="bi bi-caret-right-fill text-white"></i>
+                    <i class="bi bi-search text-white ms-3"></i>
+                </span>
+                <span class="text-white">
+                    {{ batch_count }} Items
+                    {% if search_query or date_from or date_to %}
+                    <span class="text-warning">(Filtered)</span>
+                    {% endif %}
+                </span>
+            </div>
+            {# End of Search Card Header #}
+
+            {# Search Card Body #}
+            <div class="collapse" id="searchCollapse">
+                <div class="card-body">
+                    <div class="d-flex gap-2 align-items-end">
+                        <div class="flex-grow-1">
+                            <div class="d-flex gap-2">
+                                <input type="date" class="form-control border-dark text-dark" name="date_from"
+                                    value="{{ date_from if date_from else '' }}">
+                                <span class="align-self-center">to</span>
+                                <input type="date" class="form-control border-dark text-dark" name="date_to"
+                                    value="{{ date_to if date_to else '' }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex">
+                        <input class="form-control me-2 mt-3 border-dark text-dark" type="search" name="search"
+                            placeholder="Search..." aria-label="Search"
+                            value="{{ search_query if search_query else '' }}">
+                        <button class="btn btn-dark me-2 mt-3" type="submit">Search</button>
+                        <button class="btn btn-outline-dark me-2 mt-3" id="clear_search" type="button">Clear</button>
+                    </div>
+                </div>
+            </div>
+            {# End of Search Card Body #}
+        </div>
+        {# End of Search Card #}
+
+        {# Batch list action buttons #}
+        <div class="d-flex gap-2 w-100">
+            <a href="{{ url_for('add_batch') }}" type="button"
+                class="btn btn-dark flex-fill"><span></i>+{{ freezedryer_icon() }}</span></a>
+                <a href="{{ url_for('batch_report') }}" target="_blank" class="btn btn-dark flex-fill bi bi-printer"></a>
+        </div>
+
+        {# Display batch list #}
+        {% for batch in batches %}
+        <div class="col-12 mb-4">
+
+            {# Batch Card #}
+            <div class="card border border-dark mb-5">
+                <div class="card-header mb-1 bg bg-dark">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="batch-name text-white">Batch #{{ '%08d' % batch.id }}</span>
+                        {% if batch.end_date %}
+                        <span class="badge bg-dark text-white">
+                            Completed: {{ batch.end_date.strftime('%Y-%m-%d') }}
+                        </span>
+                        {% else %}
+                        <span class="badge bg-success text-white">
+                            Started: {{ batch.start_date.strftime('%Y-%m-%d') }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# Action Buttons #}
+                <div class="d-flex gap-2 w-100">
+                    <span class="mb-3"></span>
+                    <a href="{{ url_for('view_batch', id=batch.id, search_query=search_query) }}" type="button"
+                        class="btn btn-secondary flex-fill bi bi-eye"></a>
+                    <a href="{{ url_for('edit_batch', id=batch.id) }}" type="button"
+                        class="btn btn-secondary flex-fill bi bi-pencil-square"></a>
+                        <a href="{{ url_for('batch_report', batch_id=batch.id) }}" target="_blank" class="btn btn-secondary flex-fill bi bi-printer"></a>
+                    <span></span>
+                </div>
+
+                {# Batch Info #}
+                <div class="card-body">
+                    {# Display batch contents #}
+                    {% set unique_contents = [] %}
+                    {% for tray in batch.trays %}
+                    {% if tray.contents not in unique_contents %}
+                    {{ unique_contents.append(tray.contents) or "" }}
+                    {% endif %}
+                    {% endfor %}
+                    Contents: {{ unique_contents|sort|join(', ') }}
+                </div>
+
+            </div>
+            {% endfor %}
+
+        </div>
+        {# End of Batch List #}
+
+        {# Page Navigation #}
+        <div class="d-flex justify-content-center mt-4">
+            <nav aria-label="Page navigation">
+                <ul class="pagination">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <button type="button" class="page-link btn btn-lg mx-3 border border-dark"
+                            onclick="setPage({{ pagination.prev_num }})">Previous</button>
+                    </li>
+                    {% endif %}
+                    {% for page in pagination.iter_pages() %}
+                    {% if page %}
+                    <li class="page-item {% if page == pagination.page %}active{% endif %}">
+                        <button type="button" class="page-link btn btn-lg mx-3 border border-dark bg bg-dark"
+                            onclick="setPage({{ page }})">{{ page }}</button>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link btn btn-lg mx-3">...</span></li>
+                    {% endif %}
+                    {% endfor %}
+
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <button type="button" class="page-link btn btn-lg mx-3 border border-dark"
+                            onclick="setPage({{ pagination.next_num }})">Next</button>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+
+        {# End of Page Navigation #}
+
+    </form>
+    {# End of Page Form #}
+
+    <script>
+        // Save search parameters when form is submitted
+        document.querySelector('form').addEventListener('submit', function () {
+            const searchQuery = document.querySelector('input[name="search"]').value;
+            const dateFrom = document.querySelector('input[name="date_from"]').value;
+            const dateTo = document.querySelector('input[name="date_to"]').value;
+
+            document.cookie = `batch_search=${searchQuery}; path=/; max-age=2592000`;
+            document.cookie = `batch_date_from=${dateFrom}; path=/; max-age=2592000`;
+            document.cookie = `batch_date_to=${dateTo}; path=/; max-age=2592000`;
+        });
+
+        // Clear button handler
+        document.getElementById('clear_search').addEventListener('click', function () {
+            document.cookie = "batch_search=; path=/; max-age=0";
+            document.cookie = "batch_date_from=; path=/; max-age=0";
+            document.cookie = "batch_date_to=; path=/; max-age=0";
+            document.querySelector('input[name="search"]').value = '';
+            document.querySelector('input[name="date_from"]').value = '';
+            document.querySelector('input[name="date_to"]').value = '';
+            document.querySelector('form').submit();
+        });
+
+        function setPage(pageNum) {
+            document.querySelector('input[name="page"]').value = pageNum;
+            document.querySelector('form').submit();
+        }
+
+        // Add collapse state handler
+        document.getElementById('searchCollapse').addEventListener('show.bs.collapse', function () {
+            document.getElementById('search_arrow').classList.remove('bi-caret-right-fill');
+            document.getElementById('search_arrow').classList.add('bi-caret-down-fill');
+        });
+
+        document.getElementById('searchCollapse').addEventListener('hide.bs.collapse', function () {
+            document.getElementById('search_arrow').classList.remove('bi-caret-down-fill');
+            document.getElementById('search_arrow').classList.add('bi-caret-right-fill');
+        });
+
+        if (document.getElementById('searchCollapse').classList.contains('show')) {
+            document.getElementById('search_arrow').classList.remove('bi-caret-right-fill');
+            document.getElementById('search_arrow').classList.add('bi-caret-down-fill');
+        }
+
+        // Expand search if there are search parameters
+        if (document.querySelector('input[name="search"]').value ||
+            document.querySelector('input[name="date_from"]').value ||
+            document.querySelector('input[name="date_to"]').value) {
+
+            const searchCollapse = document.getElementById('searchCollapse');
+            searchCollapse.classList.add('show');
+
+            // Update arrow to down position
+            document.getElementById('search_arrow').classList.remove('bi-caret-right-fill');
+            document.getElementById('search_arrow').classList.add('bi-caret-down-fill');
+        }
+
+    </script>
+
+    {% endblock %}
