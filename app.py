@@ -172,7 +172,7 @@ def add_batch():
             batch.trays.append(tray)
 
         db.session.commit()
-        return redirect(url_for("list_batches", id=batch.id))
+        return redirect(url_for("view_batch", id=batch.id))
 
     # Default state for a new form
     return render_template("add_batch.html", tray_count=1, trays=[], batch_notes="")
@@ -245,7 +245,7 @@ def delete_batch(id):
 
 @app.route("/add_bag/<int:id>", methods=["GET", "POST"])
 def add_bag(id):
-    tray = db.session.get(Tray, tray_id)
+    tray = db.session.get(Tray, id)
     if tray is None:
         flash(f"Tray {tray_id} not found", "danger")
         return redirect(url_for("list_batches"))
@@ -261,8 +261,7 @@ def add_bag(id):
         water_needed = round(water_needed, 1)
 
         # Query all bag IDs for the current batch
-        existing_bags = db.session.query(Bag.id).filter(
-            Bag.batch.id == tray.batch.id).all()
+        existing_bags = db.session.query(Bag.id).filter(Bag.batch_id == tray.batch.id).all()
         used_numbers = []
         for bag_id, in existing_bags:
             try:
@@ -328,11 +327,23 @@ def edit_batch(id):
         batch.end_date = datetime.strptime(
             end_date, "%Y-%m-%d") if end_date else None
 
+        # Tray Contents
+        for item in batch.trays:
+            item_key = f"tray-{item.id}"
+            if item_key in request.form:
+                item.contents = request.form[item_key]
+
         # Deleting trays
         trays_to_delete = request.form.getlist("delete_tray")
         for tray_id in trays_to_delete:
             tray = db.session.get(Tray, tray_id)
             db.session.delete(tray)
+
+        # Bag Contents
+        for item in batch.bags:
+            item_key = f"bag-{item.id}"
+            if item_key in request.form:
+                item.contents = request.form[item_key]
 
         # Deleting bags
         bags_to_delete = request.form.getlist("delete_bag")
@@ -388,7 +399,7 @@ def edit_tray(id):
             )
             tray.notes = request.form["notes"]
             db.session.commit()
-            return redirect(url_for("list_batches", id=tray.batch.id))
+            return redirect(url_for("view_batch", id=tray.batch.id))
     return render_template("edit_tray.html", tray=tray)
 
 
@@ -458,7 +469,7 @@ def update_weight(id):
     db.session.commit()
 
     # Redirect back to the batch details page with the batch expanded
-    return redirect(url_for("list_batches", id=batch.id))
+    return redirect(url_for("view_batch", id=id))
 
 
 @app.route("/favicon.ico")
@@ -505,7 +516,7 @@ def add_photo(id):
                 return render_template("add_photo.html", batch=batch, error="Unsupported file type")
 
             # Create a Photo entry in the database to get the photo ID
-            photo = Photo(id=id, filename="temp", caption=caption)
+            photo = Photo(batch_id=batch.id, filename="temp", caption=caption)
             db.session.add(photo)
             db.session.flush()  # Flush to generate the photo.id without committing
 
@@ -1016,16 +1027,6 @@ def create_batch_pdf(batch=None, batches=[]):
             if y < (margin + 105):  # Check if we need a new page
                 doc.showPage()
                 y = start_new_page(doc, title=page_title)
-                # Title
-                y = align_text(
-                    doc,
-                    f"Batch {batch.id:08d}",
-                    "center",
-                    y=y,
-                    font_name="Helvetica-Bold",
-                    font_size=18,
-                )
-                y -= 20
 
             y = align_text(
                 doc,
@@ -1063,68 +1064,58 @@ def create_batch_pdf(batch=None, batches=[]):
             y -= 10
 
         # Bags Section
-        if y < (margin + 110):
-            doc.showPage()
-            y = start_new_page(doc, title=page_title)
-
-        y = align_text(
-            doc,
-            "Bags",
-            y=y,
-            margin=margin + 20,
-            font_name="Helvetica-Bold",
-            font_size=14,
-        )
-
-        for bag in batch.bags:
-            if y < (margin + 100):
+        if batch.bags:
+            if y < (margin + 110):
                 doc.showPage()
                 y = start_new_page(doc, title=page_title)
 
             y = align_text(
                 doc,
-                f"Bag {bag.id}",
+                "Bags",
                 y=y,
-                margin=margin + 40,
+                margin=margin + 20,
                 font_name="Helvetica-Bold",
-                font_size=12,
+                font_size=14,
             )
-            align_text(doc, "Contents:", y=y, margin=margin + 60)
-            y = align_text(doc, f"{bag.contents}", y=y, margin=margin + 150)
-            align_text(doc, "Location:", y=y, margin=margin + 60)
-            y = align_text(doc, f"{bag.location}", y=y, margin=margin + 150)
-            align_text(doc, "Weight:", y=y, margin=margin + 60)
-            y = align_text(doc, f"{bag.weight}g", y=y, margin=margin + 150)
-            align_text(doc, "Water Needed:", y=y, margin=margin + 60)
-            w = bag.water_needed
-            water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
-            y = align_text(
-                doc, f"about {water_needed}", y=y, margin=margin + 150)
-            if bag.notes:
-                y -= 5
-                y = draw_wrapped_text(
+
+            for bag in batch.bags:
+                if y < (margin + 100):
+                    doc.showPage()
+                    y = start_new_page(doc, title=page_title)
+
+                y = align_text(
                     doc,
-                    f"Notes: {bag.notes}",
-                    margin + 60,
-                    y,
-                    new_page_title=page_title,
+                    f"Bag {bag.id}",
+                    y=y,
+                    margin=margin + 40,
+                    font_name="Helvetica-Bold",
+                    font_size=12,
                 )
-            y -= 10
+                align_text(doc, "Contents:", y=y, margin=margin + 60)
+                y = align_text(doc, f"{bag.contents}", y=y, margin=margin + 150)
+                align_text(doc, "Location:", y=y, margin=margin + 60)
+                y = align_text(doc, f"{bag.location}", y=y, margin=margin + 150)
+                align_text(doc, "Weight:", y=y, margin=margin + 60)
+                y = align_text(doc, f"{bag.weight}g", y=y, margin=margin + 150)
+                align_text(doc, "Water Needed:", y=y, margin=margin + 60)
+                w = bag.water_needed
+                water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
+                y = align_text(
+                    doc, f"about {water_needed}", y=y, margin=margin + 150)
+                if bag.notes:
+                    y -= 5
+                    y = draw_wrapped_text(
+                        doc,
+                        f"Notes: {bag.notes}",
+                        margin + 60,
+                        y,
+                        new_page_title=page_title,
+                    )
+                y -= 10
 
         # Photos Section
         if batch.photos:
-            if y < (margin + 310):  # Need more space for photos
-                doc.showPage()
-                y = start_new_page(doc, title=page_title)
-            else:
-                y = align_text(
-                    doc,
-                    "Photos",
-                    y=y,
-                    margin=margin + 20,
-                    font_name="Helvetica-Bold",
-                    font_size=14,
-                )
+            first = True
 
             for photo in batch.photos:
                 img_path = os.path.join(
@@ -1132,26 +1123,45 @@ def create_batch_pdf(batch=None, batches=[]):
                 if os.path.exists(img_path):
                     img = Image.open(img_path)
                     aspect = img.width / img.height
-                    width = 400
-                    height = width / aspect
+                    if aspect < 1:  # Tall image
+                        height = min(img.height, 500)  # Cap height at 500 points
+                        width = height * aspect
+                    else:  # Wide or square image
+                        width = 400
+                        height = width / aspect
 
                     if y < (margin + height):  # Check if we need a new page
                         doc.showPage()
                         y = start_new_page(doc, title=page_title)
+
+                    if first:
+                        y = align_text(
+                            doc,
+                            "Photos",
+                            y=y,
+                            margin=margin + 20,
+                            font_name="Helvetica-Bold",
+                            font_size=14,
+                        )
+                        first = False
 
                     # Calculate x position to center the image
                     x = (page_width - width) / 2
 
                     doc.drawImage(img_path, x, y - height,
                                   width=width, height=height)
+                    y -= height
+
                     if photo.caption:
-                        y = align_text(
-                            doc,
-                            photo.caption,
-                            "center",
-                            y=y - height - 15,
-                            font_size=14,
-                        )
+                        y -= 15
+                        for line in simpleSplit(photo.caption, "Helvetica", 14, 5 * inch):
+                            y = align_text(
+                                doc,
+                                line,
+                                "center",
+                                y=y,
+                                font_size=14,
+                            )
                     y -= 10
         doc.showPage()
     doc.save()

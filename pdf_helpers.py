@@ -76,6 +76,7 @@ def draw_wrapped_text(doc, text, x, y, font_size=12, margin=0.5, new_page_title=
         if y < (margin * inch + 20):
             doc.showPage()
             y = start_new_page(doc, margin, new_page_title)
+            doc.setFont("Helvetica", font_size)
         doc.drawString(x, y, line)
         y -= 15
     return y

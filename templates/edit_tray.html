@@ -43,7 +43,7 @@
                 <textarea class="form-control" id="notes" name="notes" rows="3">{{ tray.notes }}</textarea>
             </div>
             <button type="submit" class="btn btn-dark">Save Changes</button>
-            <a href="{{ url_for('list_batches', id=tray.batch_id) }}" class="btn btn-secondary">Cancel</a>
+            <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
         </form>
     </div>
 </div>

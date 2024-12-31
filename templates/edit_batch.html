@@ -4,7 +4,7 @@
 
 {# Set the page title #}
 <script>
-    document.getElementById('page_title').textContent = 'Batch {{ '%08d' % batch.id }}';
+    document.getElementById('page_title').textContent = 'Batch {{ ' %08d' % batch.id }}';
 </script>
 
 {# batch action buttons #}
@@ -48,11 +48,14 @@
     <div class="card-body">
         <ul class="list-group">
             {% for tray in batch.trays %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                Tray {{ tray.position }}: {{ tray.contents }}
-                <div>
+            <li class="list-group-item d-flex align-items-center">
+                <span class="me-2" style="white-space: nowrap;">Tray {{ tray.position }}:</span>
+                <textarea class="form-control mx-2" id="tray-{{ tray.id }}" name="tray-{{ tray.id }}"
+                    rows="1">{{ tray.contents }}</textarea>
+                <div class="ms-auto" style="white-space: nowrap;">
                     <label>
-                        <input type="checkbox" class="checkbox" name="delete_tray" value="{{ tray.id }}"> <i class="bi bi-trash ms-2"></i>
+                        <input type="checkbox" class="checkbox" name="delete_tray" value="{{ tray.id }}"> <i
+                            class="bi bi-trash ms-2"></i>
                     </label>
                 </div>
             </li>
@@ -69,11 +72,14 @@
     <div class="card-body">
         <ul class="list-group">
             {% for bag in batch.bags %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                Bag {{ bag.id }}: {{ bag.contents }}
-                <div>
+            <li class="list-group-item d-flex align-items-center">
+                <span class="me-2" style="white-space: nowrap;">Bag {{ bag.id }}:</span>
+                <textarea class="form-control mx-2" id="bag-{{ bag.id }}" name="bag-{{ bag.id }}"
+                    rows="1">{{ bag.contents }}</textarea>
+                <div class="ms-auto" style="white-space: nowrap;">
                     <label>
-                        <input type="checkbox" class="checkbox" name="delete_bag" value="{{ bag.id }}"> <i class="bi bi-trash ms-2"></i>
+                        <input type="checkbox" class="checkbox" name="delete_bag" value="{{ bag.id }}"> <i
+                            class="bi bi-trash ms-2"></i>
                     </label>
                 </div>
             </li>
@@ -90,17 +96,16 @@
     <div class="card-body">
         <ul class="list-group">
             {% for photo in batch.photos %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <img src="{{ url_for('static', filename='uploads/' + photo.filename) }}" class="img-thumbnail me-3"
-                        style="max-width: 100px; max-height: 100px;" alt="Photo thumbnail"
-                        onerror="this.outerHTML='<i class=\'bi bi-image text-muted me-3\' style=\'font-size: 100px; width: 100px;\'></i>'; this.parentElement.parentElement.querySelector('input[type=checkbox]').checked = true;">
-                    <textarea class="form-control" id="caption-{{ photo.id }}" name="caption-{{ photo.id }}"
-                        rows="1">{{ photo.caption }}</textarea>
-                </div>
-                <div>
+            <li class="list-group-item d-flex align-items-center">
+                <img src="{{ url_for('static', filename='uploads/' + photo.filename) }}" class="img-thumbnail me-3"
+                    style="max-width: 100px; max-height: 100px;" alt="Photo thumbnail"
+                    onerror="this.outerHTML='<i class=\'bi bi-image text-muted me-3\' style=\'font-size: 100px; width: 100px;\'></i>'; this.parentElement.parentElement.querySelector('input[type=checkbox]').checked = true;">
+                <textarea class="form-control mx-2" id="caption-{{ photo.id }}" name="caption-{{ photo.id }}"
+                    rows="1">{{ photo.caption }}</textarea>
+                <div class="ms-auto" style="white-space: nowrap;">
                     <label>
-                        <input type="checkbox" class="checkbox" name="delete_photo" value="{{ photo.id }}"><i class="bi bi-trash ms-2"></i>
+                        <input type="checkbox" class="checkbox" name="delete_photo" value="{{ photo.id }}"><i
+                            class="bi bi-trash ms-2"></i>
                     </label>
                 </div>
             </li>
