@@ -982,10 +982,7 @@ def create_batch_pdf(batch=None, batches=[]):
         y = align_text(
             doc, f"{batch.start_date.strftime('%Y-%m-%d')}", y=y, margin=margin + 100
         )
-        end_date_text = (
-            f"{batch.end_date.strftime(
-                '%Y-%m-%d')}" if batch.end_date else "N/A"
-        )
+        end_date_text = (f"{batch.end_date.strftime('%Y-%m-%d')}" if batch.end_date else "N/A")
         align_text(doc, "End Date:", y=y, margin=margin + 20)
         y = align_text(doc, f"{end_date_text}", y=y, margin=margin + 100)
         align_text(doc, "Status:", y=y, margin=margin + 20)
