@@ -1,28 +1,16 @@
-import magic
-import os
+# Standard library imports
 import hashlib
-from PIL import Image
+import os
 from datetime import datetime
-from models import Batch, Tray, Bag
+
+# Third-party imports
+import magic
+from PIL import Image
 from sqlalchemy import or_
 
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
+# Local application imports
+from models import Batch, Tray, Bag
 
-
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def resize_and_convert_image(image_path, max_width=800, max_height=600, quality=80):
-    with Image.open(image_path) as img:
-        if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
-        img.thumbnail((max_width, max_height))
-        output_path = os.path.splitext(image_path)[0] + ".jpg"
-        img.save(output_path, "JPEG", quality=quality)
-        if output_path != image_path:
-            os.remove(image_path)
-        return os.path.basename(output_path)
 
 
 def water_volume_imperial(grams):
@@ -42,12 +30,12 @@ def water_volume_metric(grams):
     return f"{grams:.0f}ml"
 
 
-def calculate_backup_hash(db_path, jpg_files):
+def calculate_backup_hash(db_path, image_files):
     hasher = hashlib.sha256()
     with open(db_path, "rb") as f:
         hasher.update(f.read())
-    for jpg_file in sorted(jpg_files):
-        with open(jpg_file, "rb") as f:
+    for image_file in sorted(image_files):
+        with open(image_file, "rb") as f:
             hasher.update(f.read())
     return hasher.hexdigest()
 
@@ -74,12 +62,10 @@ def validate_backup_contents(zip_file):
         elif file_path == "manifest.json":
             continue
 
-        elif file_path.startswith(uploads_prefix) and file_path.lower().endswith(
-            ".jpg"
-        ):
+        elif file_path.startswith(uploads_prefix) and file_path.lower().endswith(".webp"):
             content = zip_file.read(file_path)
             mime = magic.from_buffer(content, mime=True)
-            if mime not in ("image/jpeg", "image/jpg"):
+            if mime not in ("image/webp"):
                 return False, f"Invalid image format: {file_path}"
 
         else:
