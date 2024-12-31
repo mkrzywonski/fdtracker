@@ -676,14 +676,14 @@ def create_backup():
     db.engine.dispose()
 
     # Get list of image files
-    webp_files = []
+    image_files = []
     for root, _, files in os.walk(UPLOAD_FOLDER):
         for file in files:
             if file.lower().endswith(".webp"):
-                webp_files.append(os.path.join(root, file))
+                image_files.append(os.path.join(root, file))
 
     # Calculate hash
-    backup_hash = calculate_backup_hash(db_path, webp_files)
+    backup_hash = calculate_backup_hash(db_path, image_files)
 
     # Create backup with manifest
     backup = BytesIO()
@@ -737,15 +737,15 @@ def restore_backup():
                 manifest = json.load(f)
 
             # Get image files
-            webp_files = []
+            image_files = []
             for root, _, files in os.walk(UPLOAD_FOLDER):
                 for file in files:
                     if file.lower().endswith(".webp"):
-                        webp_files.append(os.path.join(root, file))
+                        image_files.append(os.path.join(root, file))
 
             # Verify hash
             current_hash = calculate_backup_hash(
-                "restore_temp/freezedry.db", webp_files)
+                "restore_temp/freezedry.db", image_files)
             if current_hash != manifest["hash"]:
                 return render_template(
                     "restore_backup.html",
@@ -763,8 +763,6 @@ def restore_backup():
             # Handle uploads directory
             if os.path.exists(UPLOAD_FOLDER):
                 shutil.rmtree(UPLOAD_FOLDER)
-            if os.path.exists(uploads_path):
-                shutil.copytree(uploads_path, UPLOAD_FOLDER)
             else:
                 os.makedirs(UPLOAD_FOLDER)
 
