@@ -1231,8 +1231,7 @@ def create_bag_location_inventory_pdf(bags):
                 y=y,
                 margin=margin + 200,
             )
-            y = align_text(doc, f"Weight: {
-                           bag.weight}g", y=y, margin=margin + 350)
+            y = align_text(doc, f"Weight: {bag.weight}g", y=y, margin=margin + 350)
             y = draw_wrapped_text(
                 doc, f"Contents: {bag.contents}", margin + 40, y)
             if bag.notes:
