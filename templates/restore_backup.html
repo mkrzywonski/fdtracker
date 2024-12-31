@@ -1,28 +1,33 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="container mt-4">
-    <h2>Restore Backup</h2>
 
+{% block content %}
+<script>
+    document.getElementById('page_title').textContent = 'Restore Backup';
+</script>
+<div class="container mt-4">
     {% if error %}
     <div class="alert alert-danger">
         {{ error }}
     </div>
     {% endif %}
 
-    <div class="card">
+    <div class="card border border-dark">
+        <div class="card-header bg-dark d-flex justify-content-between align-items-center">
+            <span class="text-white">Restore from backup file</span>
+        </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data">
                 <div class="mb-3">
-                    <label for="backup_file" class="btn btn-primary">Select Backup File (.zip)</label>
+                    <div id="filename" class="mt-2 text-muted border">No file selected</div>
+                    <label for="backup_file" class="btn btn-secondary">Select Backup File</label>
                     <input class="form-control form-control-sm" type="file" id="backup_file" name="backup_file"
                         accept=".zip" style="display: none;" required onchange="enableUpload(this)">
-                    <div id="filename" class="mt-2 text-muted border">No file selected</div>
                 </div>
                 <div class="alert alert-warning">
                     Warning: This will replace all current data with the backup data.
                 </div>
-                <button type="submit" id="upload-button" class="btn btn-secondary" disabled>Restore Backup</button>
-                <a href="{{ url_for('view_batches') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" id="upload-button" class="btn btn-danger" disabled>Restore Backup</button>
+                <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
             </form>
         </div>
     </div>

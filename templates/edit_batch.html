@@ -1,12 +1,24 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1 class="mb-4">Edit Batch #{{ '%08d' % batch.id }}</h1>
+
+{# Set the page title #}
+<script>
+    document.getElementById('page_title').textContent = 'Batch {{ '%08d' % batch.id }}';
+</script>
+
+{# batch action buttons #}
+<div class="d-flex gap-2 w-100 mb-3">
+    <a href="{{ url_for('list_batches', id=batch.id) }}" type="button" class="btn btn-dark flex-fill bi bi-card-list"><i
+            class="bi bi-arrow-left"></i></a>
+    <a href="{{ url_for('view_batch', id=batch.id) }}" type="button" class="btn btn-dark flex-fill bi bi-eye"><i
+            class="bi bi-arrow-left"></i></a>
+</div>
 
 <!-- Batch Details Card -->
 <div class="card border border-dark mb-4">
-    <div class="card-header bg-primary text-white">
-        Batch Details
+    <div class="card-header bg-dark text-white">
+        Edit Batch Details
     </div>
     <div class="card-body">
         <form method="POST" action="{{ url_for('edit_batch', id=batch.id) }}">
@@ -30,7 +42,7 @@
 
 <!-- Trays Card -->
 <div class="card border border-dark mb-4">
-    <div class="card-header bg-primary text-white">
+    <div class="card-header d-flex justify-content-between align-items-center bg-dark">
         Trays
     </div>
     <div class="card-body">
@@ -40,7 +52,7 @@
                 Tray {{ tray.position }}: {{ tray.contents }}
                 <div>
                     <label>
-                        <input type="checkbox" class="checkbox" name="delete_tray" value="{{ tray.id }}"> Delete
+                        <input type="checkbox" class="checkbox" name="delete_tray" value="{{ tray.id }}"> <i class="bi bi-trash ms-2"></i>
                     </label>
                 </div>
             </li>
@@ -51,7 +63,7 @@
 
 <!-- Bags Card -->
 <div class="card border border-dark mb-4">
-    <div class="card-header bg-primary text-white">
+    <div class="card-header bg-dark text-white">
         Bags
     </div>
     <div class="card-body">
@@ -61,7 +73,7 @@
                 Bag {{ bag.id }}: {{ bag.contents }}
                 <div>
                     <label>
-                        <input type="checkbox" class="checkbox" name="delete_bag" value="{{ bag.id }}"> Delete
+                        <input type="checkbox" class="checkbox" name="delete_bag" value="{{ bag.id }}"> <i class="bi bi-trash ms-2"></i>
                     </label>
                 </div>
             </li>
@@ -72,7 +84,7 @@
 
 <!-- Photos Card -->
 <div class="card border border-dark mb-4">
-    <div class="card-header bg-primary text-white">
+    <div class="card-header bg-dark text-white">
         Photos
     </div>
     <div class="card-body">
@@ -88,15 +100,15 @@
                 </div>
                 <div>
                     <label>
-                        <input type="checkbox" class="checkbox" name="delete_photo" value="{{ photo.id }}"> Delete
+                        <input type="checkbox" class="checkbox" name="delete_photo" value="{{ photo.id }}"><i class="bi bi-trash ms-2"></i>
                     </label>
                 </div>
             </li>
             {% endfor %}
         </ul>
     </div>
-</div><button type="submit" class="btn btn-primary">Save Changes</button>
-<a href="{{ url_for('view_batches', expanded_batch=batch.id) }}" class="btn btn-secondary">Cancel</a>
+</div><button type="submit" class="btn btn-dark">Save Changes</button>
+<a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
 </form>
 
 <!-- Delete Bag Card -->

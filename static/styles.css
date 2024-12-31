@@ -6,6 +6,13 @@ body {
     font-size: 3.0rem !important;
 }
 
+.navbar-text {
+    font-size: 2.8rem !important;
+    text-align: center;
+    margin: auto;
+}
+
+
 .nav-link {
     font-size: 2.8rem !important;
 }
@@ -116,4 +123,13 @@ img#preview {
 .navbar-toggler-icon {
     width: 3em;        /* Make the icon larger */
     height: 3em;       /* Make the icon larger */
+}
+
+.form-check-input:checked {
+    background-color: #000000 !important;
+    border-color: #000000 !important;
+}
+
+.form-check-input:hover {
+    border-color: #000000;
 }

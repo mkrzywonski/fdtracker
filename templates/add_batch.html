@@ -1,7 +1,12 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="form-title text-center">Add New Batch</div>
+
+{# Set the page title #}
+<script>
+    document.getElementById('page_title').textContent = "Add Batch";
+</script>
+
 <form method="POST">
     {% if error_messages %}
     <div class="alert alert-danger">
@@ -13,19 +18,18 @@
     </div>
     {% endif %}
 
-    <div class="mb-3 row align-items-center">
-        <label class="form-label col-sm-4 col-form-label text-end text-nowrap">Number of Trays</label>
-        <div class="col-sm-2">
-            <select name="tray_count" class="form-control w-auto" id="trayCount">
-                <option value="" disabled selected>Select...</option>
-                {% for i in range(1, 8) %}
-                <option value="{{ i }}" {% if tray_count and i==tray_count %}selected{% endif %}>
-                    {{ i }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
+    <div class="d-flex align-items-center gap-2 mb-3 ms-3">
+        <label class="form-label text-nowrap mb-0">Number of Trays</label>
+        <select name="tray_count" class="form-control w-auto" id="trayCount">
+            <option value="" disabled selected>Select...</option>
+            {% for i in range(1, 8) %}
+            <option value="{{ i }}" {% if tray_count and i==tray_count %}selected{% endif %}>
+                {{ i }}
+            </option>
+            {% endfor %}
+        </select>
     </div>
+    
 
     <div id="trayContainer" data-trays="{{ trays | tojson | safe }}">
         {% for i in range(tray_count) %}
@@ -59,8 +63,8 @@
                 rows="3">{{ batch_notes if batch_notes else '' }}</textarea>
         </div>
     </div>
-    <button type="submit" class="btn btn-primary">Start Batch</button>
-    <a href="{{ url_for('view_batches') }}" class="btn btn-secondary">Cancel</a>
+    <button type="submit" class="btn btn-dark">Start Batch</button>
+    <a href="{{ url_for('list_batches') }}" class="btn btn-secondary">Cancel</a>
 </form>
 
 <script>

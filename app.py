@@ -23,167 +23,71 @@ from flask import (
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
-from sqlalchemy import or_
-from markupsafe import Markup
 import qrcode
 from PIL import Image
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import inch
+from reportlab.lib.pagesizes import inch, letter
 from reportlab.lib.utils import ImageReader, simpleSplit
+from markupsafe import Markup
 
+# Local imports
+from models import Bag, Batch, Tray, Photo, db
+from utils import (
+    allowed_file,
+    resize_and_convert_image,
+    water_volume_imperial,
+    water_volume_metric,
+    calculate_backup_hash,
+    validate_backup_contents,
+    search_batches,
+    search_bags
+)
+from pdf_helpers import (
+    align_text,
+    draw_page_border,
+    start_new_page, 
+    draw_wrapped_text, 
+    draw_image
+)
 
+# Flask app configuration
+app = Flask(__name__)
+app.config.update({
+    'SQLALCHEMY_DATABASE_URI': 'sqlite:///freezedry.db',
+    'UPLOAD_FOLDER': 'static/uploads'
+})
 
-# Read the configuration file
+# Constants
+PER_PAGE = 25
+
+# Load configuration file
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-# Get internal Flask binding settings
+# Server settings
 flask_host = config.get('server', 'flask_host', fallback='127.0.0.1')
 flask_port = config.getint('server', 'flask_port', fallback=5000)
-
-# Get public-facing URL
 public_url = config.get('server', 'public_url', fallback=None)
 
-# Parse the public URL into components (if provided)
+# Configure public URL settings if provided
 if public_url:
     parsed_url = urlparse(public_url)
-    public_host = parsed_url.netloc  # Includes domain and port
-    public_scheme = parsed_url.scheme  # http or https
-else:
-    public_host = None
-    public_scheme = None
+    app.config['SERVER_NAME'] = parsed_url.netloc
 
-# Flask app setup
-app = Flask(__name__)
+# Initialize database
+db.init_app(app)
 
-# Set SERVER_NAME if the public host is configured
-if public_host:
-    app.config['SERVER_NAME'] = public_host
+# Set up upload directory
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Middleware for reverse proxy headers
+# Add reverse proxy support
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///freezedry.db'
-db = SQLAlchemy(app)
-PER_PAGE = 25  # Number of items per page
-
-UPLOAD_FOLDER = 'static/uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
-class Batch(db.Model):
-    __tablename__ = 'batch'
-    id = db.Column(db.Integer, primary_key=True, index=True)
-    start_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    end_date = db.Column(db.DateTime)
-    notes = db.Column(db.Text, index=True)  # Add index for better search performance
-    status = db.Column(db.String(20), default='In Progress')
-
-    # Relationships with cascading deletes and lazy loading
-    trays = db.relationship(
-        'Tray', backref='batch', lazy='dynamic', cascade='all, delete-orphan'
-    )
-    bags = db.relationship(
-        'Bag', backref='batch', lazy='dynamic', cascade='all, delete-orphan'
-    )
-    photos = db.relationship(
-        'Photo', backref='batch', lazy='dynamic', cascade='all, delete-orphan'
-    )
-    @property
-    def total_starting_weight(self):
-        return sum(tray.starting_weight or 0 for tray in self.trays)
-    @property
-    def total_ending_weight(self):
-        return sum(tray.ending_weight or 0 for tray in self.trays)
-
-
-class Tray(db.Model):
-    __tablename__ = 'tray'
-    id = db.Column(db.Integer, primary_key=True)
-    batch_id = db.Column(
-        db.Integer, db.ForeignKey('batch.id', ondelete='CASCADE'), nullable=False, index=True
-    )
-    contents = db.Column(db.String(100), nullable=False, index=True)
-    starting_weight = db.Column(db.Float)
-    ending_weight = db.Column(db.Float)
-    previous_weight = db.Column(db.Float)
-    notes = db.Column(db.Text, index=True)
-    position = db.Column(db.Integer, nullable=False)  # Tray position in the machine
-
-
-class Bag(db.Model):
-    __tablename__ = 'bag'
-    id = db.Column(db.String(20), primary_key=True)
-    batch_id = db.Column(
-        db.Integer, db.ForeignKey('batch.id', ondelete='CASCADE'), nullable=False, index=True
-    )
-    contents = db.Column(db.String(100), nullable=False, index=True)
-    weight = db.Column(db.Float, nullable=False)
-    location = db.Column(db.String(100), index=True)
-    notes = db.Column(db.Text, index=True)
-    water_needed = db.Column(db.Float)
-    created_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    consumed_date = db.Column(db.DateTime)
-
-class Photo(db.Model):
-    __tablename__ = 'photo'
-    id = db.Column(db.Integer, primary_key=True)
-    batch_id = db.Column(db.Integer, db.ForeignKey('batch.id', ondelete='CASCADE'), nullable=False, index=True)
-    filename = db.Column(db.String(255), nullable=False)
-    caption = db.Column(db.Text)
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 @app.route('/')
-def view_batches():
-    page = request.args.get('page', 1, type=int)
-    search_query = request.args.get('search', '').strip()
-    expanded_batch = request.args.get('expanded_batch', type=int)
-
-    # Base query
-    query = Batch.query
-
-    # Apply search filter if a search query is provided
-    if search_query:
-        try:
-            search_id = int(search_query)
-        except ValueError:
-            search_id = None
-
-        filters = [Batch.id == search_id, Batch.notes.ilike(f"%{search_query}%")]
-
-        if search_query:
-            filters.extend([
-                Tray.contents.ilike(f"%{search_query}%"),
-                Tray.notes.ilike(f"%{search_query}%"),
-                Bag.contents.ilike(f"%{search_query}%"),
-                Bag.notes.ilike(f"%{search_query}%"),
-            ])
-
-        query = query.outerjoin(Tray).outerjoin(Bag).filter(or_(*filters))
-
-    # Handle expanded batch
-    if expanded_batch:
-        all_batches = query.order_by(Batch.id.desc()).all()
-        batch_ids = [batch.id for batch in all_batches]
-
-        if expanded_batch in batch_ids:
-            batch_index = batch_ids.index(expanded_batch)
-            page = (batch_index // PER_PAGE) + 1
-
-    # Paginate the filtered results
-    pagination = query.order_by(Batch.id.desc()).paginate(page=page, per_page=PER_PAGE)
-    batches = pagination.items
-
-    return render_template(
-        'batches.html',
-        batches=batches,
-        pagination=pagination,
-        expanded_batch=expanded_batch,
-        search_query=search_query
-    )
+def root():
+    return list_batches()
 
 @app.route('/add', methods=['GET', 'POST'])
 def add_batch():
@@ -237,7 +141,7 @@ def add_batch():
             batch.trays.append(tray)
 
         db.session.commit()
-        return redirect(url_for('view_batches', expanded_batch=batch.id))
+        return redirect(url_for('list_batches', id=batch.id))
 
     # Default state for a new form
     return render_template('add_batch.html', tray_count=1, trays=[], batch_notes='')
@@ -277,7 +181,7 @@ def complete_batch(id):
     batch.end_date = datetime.utcnow()
     db.session.commit()
 
-    return redirect(url_for('view_batches'))
+    return redirect(url_for('list_batches'))
 
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete_batch(id):
@@ -291,7 +195,7 @@ def delete_batch(id):
     
     db.session.delete(batch)
     db.session.commit()
-    return redirect(url_for('view_batches'))
+    return redirect(url_for('list_batches'))
 
 @app.route('/add_bag/<int:tray_id>', methods=['GET', 'POST'])
 def add_bag(tray_id):
@@ -327,15 +231,16 @@ def add_bag(tray_id):
         )
         db.session.add(bag)
         db.session.commit()
-        return redirect(url_for('view_batches', expanded_batch=tray.batch_id))
+        return redirect(url_for('view_bag', id=bag.id))
     return render_template('add_bag.html', tray=tray)
 
 @app.route('/delete_bag/<string:id>', methods=['POST'])
 def delete_bag(id):
     bag = Bag.query.get_or_404(id)
+    batch_id = bag.batch_id
     db.session.delete(bag)
     db.session.commit()
-    return redirect(url_for('view_batches', expanded_batch=bag.batch_id))
+    return redirect(url_for('list_batches', id=batch_id))
 
 @app.route('/consume_bag/<string:id>', methods=['POST'])
 def consume_bag(id):
@@ -345,7 +250,7 @@ def consume_bag(id):
     next_url = request.args.get('next')
     if next_url:
         return redirect(next_url)
-    return redirect(url_for('view_batches', expanded_batch=bag.batch_id))
+    return redirect(url_for('list_batches', id=bag.batch_id))
 
 @app.route('/edit_batch/<int:id>', methods=['GET', 'POST'])
 def edit_batch(id):
@@ -383,7 +288,7 @@ def edit_batch(id):
                 os.remove(file_path)
             db.session.delete(photo)
         db.session.commit()
-        return redirect(url_for('view_batches', expanded_batch=batch.id))
+        return redirect(url_for('list_batches', id=batch.id))
 
     return render_template('edit_batch.html', batch=batch)
 
@@ -396,14 +301,14 @@ def edit_tray(id):
             batch_id = tray.batch_id
             db.session.delete(tray)
             db.session.commit()
-            return redirect(url_for('view_batches', expanded_batch=batch_id))
+            return redirect(url_for('view_batch', id=batch_id))
         else:
             tray.contents = request.form['contents']
             tray.starting_weight = float(request.form['starting_weight']) if request.form['starting_weight'] else None
             tray.ending_weight = float(request.form['ending_weight']) if request.form['ending_weight'] else None
             tray.notes = request.form['notes']
             db.session.commit()
-            return redirect(url_for('view_batches', expanded_batch=tray.batch_id))
+            return redirect(url_for('list_batches', id=tray.batch_id))
     return render_template('edit_tray.html', tray=tray)
 
 @app.route('/edit_bag/<string:id>', methods=['GET', 'POST'])
@@ -435,13 +340,6 @@ def edit_bag(id):
             return redirect(next_url)            
     return render_template('edit_bag.html', bag=bag, next=next_url)
 
-@app.template_filter('highlight')
-def highlight_search(text, search):
-    if not search:
-        return text
-    escaped_search = re.escape(search)
-    return Markup(re.sub(f"({escaped_search})", r"<mark>\1</mark>", text, flags=re.IGNORECASE))
-
 @app.route('/update_weight/<int:batch_id>', methods=['POST'])
 def update_weight(batch_id):
     batch = Batch.query.get_or_404(batch_id)
@@ -458,53 +356,7 @@ def update_weight(batch_id):
     db.session.commit()
 
     # Redirect back to the batch details page with the batch expanded
-    return redirect(url_for('view_batches', expanded_batch=batch.id))
-
-@app.route('/view_bags')
-def view_bags():
-    page = request.args.get('page', 1, type=int)
-    search_query = request.args.get('search', '').strip()
-    expanded_bag = request.args.get('expanded_bag', type=str)
-    unopened = request.args.get('unopened', type=str) == 'on'
-
-    # Base query
-    query = Bag.query
-
-    # Apply search filter
-    if search_query:
-        query = query.filter(
-            or_(
-                Bag.id.ilike(f"%{search_query}%"),
-                Bag.contents.ilike(f"%{search_query}%"),
-                Bag.notes.ilike(f"%{search_query}%"),
-            )
-        )
-
-    # Filter for unopened bags
-    if unopened:
-        query = query.filter(Bag.consumed_date.is_(None))
-
-    # Handle expanded bag
-    if expanded_bag:
-        all_bags = query.order_by(Bag.id.desc()).all()
-        bag_ids = [bag.id for bag in all_bags]
-
-        if expanded_bag in bag_ids:
-            bag_index = bag_ids.index(expanded_bag)
-            page = (bag_index // PER_PAGE) + 1
-
-    # Paginate the filtered results
-    pagination = query.order_by(Bag.id.desc()).paginate(page=page, per_page=PER_PAGE)
-    bags = pagination.items
-
-    return render_template(
-        'bags.html',
-        bags=bags,
-        pagination=pagination,
-        expanded_bag=expanded_bag,
-        search_query=search_query,
-        unopened=unopened
-    )
+    return redirect(url_for('list_batches', id=batch.id))
 
 @app.route('/favicon.ico')
 def favicon():
@@ -513,30 +365,6 @@ def favicon():
         path='freezedryer.svg',
         mimetype='image/svg+xml'
     )
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def resize_and_convert_image(image_path, max_width=800, max_height=600, quality=80):
-    with Image.open(image_path) as img:
-        # Convert to RGB if needed (in case of PNG with transparency)
-        if img.mode in ('RGBA', 'P'):
-            img = img.convert('RGB')
-        
-        # Resize maintaining aspect ratio
-        img.thumbnail((max_width, max_height))
-        
-        # Get the output path with .jpg extension
-        output_path = os.path.splitext(image_path)[0] + '.jpg'
-        
-        # Save as JPEG with specified quality
-        img.save(output_path, 'JPEG', quality=quality)
-        
-        # Remove original file if different from output
-        if output_path != image_path:
-            os.remove(image_path)
-            
-        return os.path.basename(output_path)
 
 @app.route('/add_photo/<int:batch_id>', methods=['GET', 'POST'])
 def add_photo(batch_id):
@@ -564,7 +392,7 @@ def add_photo(batch_id):
             photo.filename = final_filename
             
             db.session.commit()
-            return redirect(url_for('view_batches', expanded_batch=batch_id))
+            return redirect(url_for('list_batches', id=batch_id))
     
     return render_template('add_photo.html', batch=batch)
 
@@ -573,7 +401,7 @@ def print_label(id):
     bag = Bag.query.get_or_404(id)
 
     # Create QR code with batch URL
-    batch_url = url_for('view_bags', expanded_bag=bag.id, _external=True)
+    batch_url = url_for('view_bag', id=bag.id, _external=True)
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(batch_url)
     qr.make(fit=True)
@@ -586,8 +414,6 @@ def print_label(id):
 
     # Create PDF in memory
     buffer = BytesIO()
-
-    # Create the PDF canvas
     c = canvas.Canvas(buffer, pagesize=(4*inch, 6*inch))
     
     # Draw the border and line
@@ -596,11 +422,9 @@ def print_label(id):
     c.roundRect(0.1 * inch, 0.1 * inch, 3.8 * inch, 5.8 * inch, 0.25 * inch)
     c.line(0.1 * inch, 5.4 * inch, 3.9 * inch, 5.4 * inch)
     
-    # Add batch ID and date text
-    c.setFont('Helvetica-Bold', 12)
-    c.drawString(0.2 * inch, 5.6 * inch, f"Batch: {bag.batch_id:08d}")
     date_text = bag.batch.start_date.strftime('%Y-%m-%d')
-    c.drawRightString(3.8 * inch, 5.6 * inch, date_text)
+    align_text(c, f"Batch: {bag.batch_id:08d}", y=5.55 * inch, margin=0.3 * inch, font_name="Helvetica-Bold", font_size=14)
+    align_text(c, date_text, "right", y=5.55 * inch, margin=0.3 * inch, font_name="Helvetica-Bold", font_size=14, page_width=4)
     
     # Add centered contents with text wrapping
     from reportlab.lib.utils import simpleSplit
@@ -620,17 +444,13 @@ def print_label(id):
     x = 0.2 * inch  # Left margin
     
     # Fixed details
-    c.drawString(x, y, f"Bag ID: {bag.id}")
-    y -= 15
-    c.drawString(x, y, f"Freeze Dried Weight: {bag.weight}g")
-    y -= 15
+    y = align_text(c, f"Bag ID: {bag.id}", y=y, margin=x)
+    y = align_text(c, f"Freeze Dried Weight: {bag.weight}g", y=y, margin=x)
     original_weight = round(bag.weight + bag.water_needed, 1)
-    c.drawString(x, y, f"Original Weight: ~{original_weight}g")
-    y -= 15
+    y = align_text(c, f"Original Weight: ~{original_weight}g", y=y, margin=x)
     w = bag.water_needed
     water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
-    c.drawString(x, y, f"Water Needed: ~{water_needed}")
-    y -= 15
+    y = align_text(c, f"Water Needed: ~{water_needed}", y=y, margin=x)
 
     # Wrapping text for location
     if bag.location:
@@ -641,8 +461,7 @@ def print_label(id):
 
     # Wrapping text for notes
     if bag.notes:
-        y -= 10  # Extra space before notes
-        wrapped_notes = simpleSplit(f"{bag.notes}", c._fontname, c._fontsize, text_width)
+        wrapped_notes = simpleSplit(f"Notes: {bag.notes}", c._fontname, c._fontsize, text_width)
         for line in wrapped_notes:
             c.drawString(x, y, line)
             y -= 15
@@ -652,6 +471,7 @@ def print_label(id):
     qr_x = (4 * inch - qr_width) / 2  # Center horizontally
     qr_y = 0.2 * inch  # Position from bottom
     c.drawImage(ImageReader(qr_buffer), qr_x, qr_y, qr_width, qr_height)
+    y = align_text(c, f"{batch_url}", "center", y=0.175*inch, font_size=8, page_width=4)
     
     c.save()
     buffer.seek(0)
@@ -662,37 +482,6 @@ def print_label(id):
         mimetype='application/pdf'
     )
 
-def water_volume_imperial(grams):
-    ounces = grams / 29.5735  # 1 fl oz = 29.5735g water
-    if ounces < 8:
-        return f"{ounces:.1f}oz"
-        
-    cups = ounces / 8  # 8 fl oz = 1 cup
-    if cups < 4:
-        return f"{cups:.1f}cup"
-        
-    quarts = cups / 4  # 4 cups = 1 quart
-    return f"{quarts:.1f}qt"
-
-def water_volume_metric(grams):
-    if grams >= 1000:
-        return f"{grams/1000:.1f}L"
-    return f"{grams:.0f}ml"
-
-def calculate_backup_hash(db_path, jpg_files):
-    """Calculate a hash of the database and jpg files"""
-    hasher = hashlib.sha256()
-    
-    # Hash database content
-    with open(db_path, 'rb') as f:
-        hasher.update(f.read())
-        
-    # Hash jpg files in sorted order for consistency
-    for jpg_file in sorted(jpg_files):
-        with open(jpg_file, 'rb') as f:
-            hasher.update(f.read())
-            
-    return hasher.hexdigest()
 
 @app.route('/backup')
 def create_backup():
@@ -738,42 +527,6 @@ def create_backup():
         as_attachment=True,
         download_name=f'fdtracker_backup_{datetime.now().strftime("%Y%m%d")}.zip'
     )
-
-import magic  # For file type detection
-
-def validate_backup_contents(zip_file):
-    """Validate all files in the backup archive"""
-    valid_files = {'freezedry.db', 'manifest.json'}
-    uploads_prefix = 'static/uploads/'
-    
-    # Check that all required files exist
-    found_files = set(name for name in zip_file.namelist() if '/' not in name)
-    missing_files = valid_files - found_files
-    if missing_files:
-        return False, f"Missing required files: {', '.join(missing_files)}"
-    
-    # Validate each file
-    for file_path in zip_file.namelist():
-        if file_path == 'freezedry.db':
-            content = zip_file.read(file_path)
-            mime = magic.from_buffer(content, mime=True)
-            if mime != 'application/x-sqlite3':
-                return False, "Invalid database file format"
-                
-        elif file_path == 'manifest.json':
-            continue
-            
-        elif file_path.startswith(uploads_prefix) and file_path.lower().endswith('.jpg'):
-            content = zip_file.read(file_path)
-            mime = magic.from_buffer(content, mime=True)
-            if mime not in ('image/jpeg', 'image/jpg'):
-                return False, f"Invalid image format: {file_path}"
-                
-        else:
-            return False, f"Unexpected file in backup: {file_path}"
-            
-    return True, None
-
 
 @app.route('/restore', methods=['GET', 'POST'])
 def restore_backup():
@@ -837,8 +590,411 @@ def restore_backup():
     # Reconnect to database
     db.create_all()
     
-    return redirect(url_for('view_batches'))
+    return redirect(url_for('list_batches'))
 
+@app.route('/list_batches', methods=['GET', 'POST'])
+def list_batches():
+    # Check cookies first, then form data
+    page = int(request.form.get('page', 1))
+    search_query = request.cookies.get('batch_search', request.form.get('search', '')).strip()
+    date_from = request.cookies.get('batch_date_from', request.form.get('date_from'))
+    date_to = request.cookies.get('batch_date_to', request.form.get('date_to'))
+    id = request.args.get('id', type=int)
+
+    query = search_batches(search_query, date_from, date_to)
+    query = query.order_by(Batch.id.desc())
+    batch_count = query.count()
+
+    # Find the page containing the specified batch id
+    if id is not None:
+        all_batches = query.order_by(Batch.id.desc()).all()
+        batch_ids = [batch.id for batch in all_batches]
+        if id in batch_ids:
+            batch_index = batch_ids.index(id)
+            page = (batch_index // PER_PAGE) + 1
+
+    pagination = query.paginate(page=page, per_page=PER_PAGE)
+    batches = pagination.items
+
+    return render_template(
+        'list_batches.html',
+        batches=batches,
+        batch_count=batch_count,
+        pagination=pagination,
+        search_query=search_query,
+        date_from=date_from,
+        date_to=date_to
+    )
+
+
+@app.route('/list_bags', methods=['GET', 'POST'])
+def list_bags():
+    id = request.args.get('id')
+    page = int(request.form.get('page', 1))
+    search_query = request.cookies.get('bag_search', request.form.get('search', '')).strip()
+    date_from = request.cookies.get('bag_date_from', request.form.get('date_from'))
+    date_to = request.cookies.get('bag_date_to', request.form.get('date_to'))
+    
+    # Handle checkbox states
+    newest_form = request.form.get('newest')
+    newest_cookie = request.cookies.get('bag_newest')
+    newest = newest_form == 'on' if newest_form is not None else newest_cookie == 'true'
+    if newest_form is None and newest_cookie is None:
+        newest = True  # Default value for fresh visits
+    unopened_form = request.form.get('unopened')
+    unopened_cookie = request.cookies.get('bag_unopened')
+    unopened = unopened_form == 'on' if unopened_form is not None else unopened_cookie == 'true'
+    if unopened_form is None and unopened_cookie is None:
+        unopened = False  # Default value for fresh visits
+
+
+    # Base query
+    query = search_bags(search_query, date_from, date_to, unopened)
+    if newest:
+        query = query.order_by(Bag.id.desc())
+    else:
+        query = query.order_by(Bag.id.asc())
+    query = query.order_by(Bag.created_date.desc())
+    bag_count = query.count()
+
+    # Find the page containing the specified bag id
+    if id is not None:
+        all_bags = query.order_by(Bag.id.desc()).all()
+        bag_ids = [bag.id for bag in all_bags]
+        if id in bag_ids:
+            bag_index = bag_ids.index(id)
+            page = (bag_index // PER_PAGE) + 1
+
+    # Paginate the filtered results
+    pagination = query.order_by(Bag.id.desc()).paginate(page=page, per_page=PER_PAGE)
+    bags = pagination.items
+
+    return render_template(
+        'list_bags.html',
+        bags=bags,
+        bag_count=bag_count,
+        pagination=pagination,
+        search_query=search_query,
+        date_from=date_from,
+        date_to=date_to,
+        unopened=unopened,
+        newest=newest
+    )
+
+@app.route('/view_batch/<int:id>', methods=['GET'])
+def view_batch(id):
+    batch = Batch.query.get_or_404(id)
+    search_query = request.args.get('search_query', '')
+    return render_template('view_batch.html', batch=batch, search_query=search_query)
+
+@app.route('/view_bag/<string:id>', methods=['GET'])
+def view_bag(id):
+    bag = Bag.query.get_or_404(id)
+    search_query = request.args.get('search_query', '')
+    return render_template('view_bag.html', bag=bag, search_query=search_query)
+
+
+@app.template_filter('highlight')
+def highlight_search(text, search):
+    if not search:
+        return text
+    escaped_search = re.escape(search)
+    return Markup(re.sub(f"({escaped_search})", r"<mark>\1</mark>", text, flags=re.IGNORECASE))    
+
+@app.route('/batch_report/')
+@app.route('/batch_report/<int:batch_id>')
+def batch_report(batch_id=None):
+    if batch_id:
+        # Single batch report
+        batch = Batch.query.get_or_404(batch_id)
+        buffer = create_batch_pdf(batch=batch)
+    else:
+        # Multiple batch report from search parameters
+        search_query = request.cookies.get('batch_search', '').strip()
+        date_from = request.cookies.get('batch_date_from')
+        date_to = request.cookies.get('batch_date_to')
+        
+        # Use existing search_batches function to get filtered batches
+        query = search_batches(search_query, date_from, date_to)
+        batches = query.order_by(Batch.id).all()
+        buffer = create_batch_pdf(batches=batches)
+
+    buffer.seek(0)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'batch_report_{timestamp}.pdf'
+    
+    return send_file(
+        buffer,
+        mimetype='application/pdf',
+        download_name=filename
+    )
+
+
+def create_batch_pdf(batch=None, batches=[]):
+    if batch is not None:
+        batches.append(batch)
+        
+    buffer = BytesIO()
+    doc = canvas.Canvas(buffer, pagesize=letter)
+    
+    # Letter dimensions and margins
+    page_width, page_height = letter
+    margin = 0.5 * inch  # Half inch margin
+    border_padding = 0.1 * inch
+    
+    # Content area inside border
+    content_width = page_width - (2 * margin)
+    content_height = page_height - (2 * margin)
+
+    for batch in batches:
+        # Start Batch Details Page
+        page_title = f"Batch {batch.id:08d}"
+        y = start_new_page(doc, title=page_title)
+        
+        # Batch Details
+        y = align_text(doc, "Batch Information", y=y, margin=margin+20, font_name="Helvetica-Bold", font_size=14)
+        align_text(doc, "Start Date:", y=y, margin=margin+20)
+        y = align_text(doc, f"{batch.start_date.strftime('%Y-%m-%d')}", y=y, margin=margin+100)
+        end_date_text = f"{batch.end_date.strftime('%Y-%m-%d')}" if batch.end_date else "N/A"
+        align_text(doc, "End Date:", y=y, margin=margin+20)
+        y = align_text(doc, f"{end_date_text}", y=y, margin=margin+100)
+        align_text(doc, "Status:", y=y, margin=margin+20)
+        y = align_text(doc, f"{batch.status}", y=y, margin=margin+100)
+        y -= 20
+        y = align_text(doc, "Notes", y=y, margin=margin+20, font_name="Helvetica-Bold", font_size=14)
+        notes_text = f"{batch.notes.strip()}" if batch.notes else "N/A"
+        y = draw_wrapped_text(doc, notes_text, margin + 20, y, new_page_title=page_title)
+        y -= 20
+
+        # Trays Section
+        y = align_text(doc, "Trays", y=y, margin=margin+20, font_name="Helvetica-Bold", font_size=14)
+        
+        for tray in batch.trays:
+            if y < (margin + 105):  # Check if we need a new page
+                doc.showPage()
+                y = start_new_page(doc, title=page_title)
+                # Title
+                y = align_text(doc, f"Batch {batch.id:08d}", "center", y=y, font_name="Helvetica-Bold", font_size=18)
+                y -= 20
+
+            y = align_text(doc, f"Tray {tray.position}", y=y, margin=margin+40, font_name="Helvetica-Bold", font_size=12)
+            align_text(doc, "Contents:", y=y, margin=margin+60)
+            y = align_text(doc, f"{tray.contents}", y=y, margin=margin+160)
+            align_text(doc, "Starting Weight:", y=y, margin=margin+60)
+            y = align_text(doc, f"{tray.starting_weight}g", y=y, margin=margin+160)
+            align_text(doc, "Ending Weight:", y=y, margin=margin+60)
+            y = align_text(doc, f"{tray.ending_weight}g", y=y, margin=margin+160)
+            if tray.ending_weight is not None:
+                w = tray.starting_weight - tray.ending_weight
+                water_removed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
+                align_text(doc, "Water Removed:", y=y, margin=margin+60)
+                y = align_text(doc, f"{water_removed}", y=y, margin=margin+160)
+            else:
+                align_text(doc, "Water Removed:", y=y, margin=margin+60)
+                y = align_text(doc, "Not yet measured", y=y, margin=margin+160)
+            if tray.notes:
+                y = draw_wrapped_text(doc, f"Notes: {tray.notes}", margin + 60, y, new_page_title=page_title)
+            y -= 10
+
+        # Bags Section
+        if y < (margin + 110):
+            doc.showPage()
+            y = start_new_page(doc, title=page_title)
+            
+        y = align_text(doc, "Bags", y=y, margin=margin+20, font_name="Helvetica-Bold", font_size=14)
+        
+        for bag in batch.bags:
+            if y < (margin + 100):
+                doc.showPage()
+                y = start_new_page(doc, title=page_title)
+
+            y = align_text(doc, f"Bag {bag.id}", y=y, margin=margin+40, font_name="Helvetica-Bold", font_size=12)
+            align_text(doc, "Contents:", y=y, margin=margin+60)
+            y = align_text(doc, f"{bag.contents}", y=y, margin=margin+150)
+            align_text(doc, "Location:", y=y, margin=margin+60)
+            y = align_text(doc, f"{bag.location}", y=y, margin=margin+150)
+            align_text(doc, "Weight:", y=y, margin=margin+60)
+            y = align_text(doc, f"{bag.weight}g", y=y, margin=margin+150)
+            align_text(doc, "Water Needed:", y=y, margin=margin+60)
+            w = bag.water_needed
+            water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
+            y = align_text(doc, f"about {water_needed}", y=y, margin=margin+150)
+            if bag.notes:
+                y = draw_wrapped_text(doc, f"Notes: {bag.notes}", margin + 60, y, new_page_title=page_title)
+            y -= 10
+
+        # Photos Section
+        if batch.photos:
+            if y < (margin + 310):  # Need more space for photos
+                doc.showPage()
+                y = start_new_page(doc, title=page_title)
+            else:
+                y = align_text(doc, "Photos", y=y, margin=margin+20, font_name="Helvetica-Bold", font_size=14)
+                
+            for photo in batch.photos:
+                img_path = os.path.join(app.config['UPLOAD_FOLDER'], photo.filename)
+                if os.path.exists(img_path):
+                    img = Image.open(img_path)
+                    aspect = img.width / img.height
+                    width = 400
+                    height = width / aspect
+
+                    if y < (margin + height):  # Check if we need a new page
+                        doc.showPage()
+                        y = start_new_page(doc, title=page_title)
+
+                    # Calculate x position to center the image
+                    x = (page_width - width) / 2
+                    
+                    doc.drawImage(img_path, x, y - height, width=width, height=height)
+                    if photo.caption:
+                        y = align_text(doc, photo.caption, "center", y=y - height - 15, font_size=14)
+                    y -= 10
+        doc.showPage()
+    doc.save()
+    return buffer
+
+@app.route('/bag_location_inventory')
+def bag_location_inventory():
+    # Get search parameters from cookies
+    search_query = request.cookies.get('bag_search', '').strip()
+    date_from = request.cookies.get('bag_date_from')
+    date_to = request.cookies.get('bag_date_to')
+    
+    # Use existing search_bags function to get filtered bags
+    query = search_bags(search_query, date_from, date_to, unopened=True)
+    bags = query.order_by(Bag.location, Bag.id).all()
+    
+    buffer = create_bag_location_inventory_pdf(bags)
+    buffer.seek(0)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'location_inventory_{timestamp}.pdf'
+    
+    return send_file(
+        buffer,
+        mimetype='application/pdf',
+        download_name=filename
+    )
+
+def create_bag_location_inventory_pdf(bags):
+    buffer = BytesIO()
+    doc = canvas.Canvas(buffer, pagesize=letter)
+    margin = 0.5 * inch
+    
+    # Group bags by location
+    location_groups = {}
+    for bag in bags:
+        location = bag.location or 'Unspecified Location'
+        if location not in location_groups:
+            location_groups[location] = []
+        location_groups[location].append(bag)
+
+    # Start first page
+    y = start_new_page(doc, title="Location Inventory")
+    
+    # Print inventory by location
+    for location in sorted(location_groups.keys()):
+        if y < (margin + 60):
+            doc.showPage()
+            y = start_new_page(doc, title="Location Inventory")
+            
+        # Location header
+        y = align_text(doc, location, y=y, margin=margin+20, font_name="Helvetica-Bold", font_size=14)
+        y -= 10
+        
+        # Print bags in this location
+        for bag in location_groups[location]:
+            if y < (margin + 60):
+                doc.showPage()
+                y = start_new_page(doc, title="Location Inventory")
+                
+            # Bag details
+            align_text(doc, f"Bag {bag.id}", y=y, margin=margin+40, font_name="Helvetica-Bold")
+            align_text(doc, f"Created: {bag.created_date.strftime('%Y-%m-%d')}", y=y, margin=margin+200)
+            y = align_text(doc, f"Weight: {bag.weight}g", y=y, margin=margin+350)
+            y = draw_wrapped_text(doc, f"Contents: {bag.contents}", margin + 40, y)
+            if bag.notes:
+                y = draw_wrapped_text(doc, f"Notes: {bag.notes}", margin + 40, y)
+            y -= 10
+            
+        y -= 10  # Extra space between locations
+    
+    doc.save()
+    return buffer
+
+@app.route('/bag_inventory')
+def bag_inventory():
+    # Get all search parameters from cookies
+    search_query = request.cookies.get('bag_search', '').strip()
+    date_from = request.cookies.get('bag_date_from')
+    date_to = request.cookies.get('bag_date_to')
+    unopened = request.cookies.get('bag_unopened') == 'true'
+    newest = request.cookies.get('bag_newest') == 'true'
+    
+    # Use existing search_bags function to get filtered bags
+    query = search_bags(search_query, date_from, date_to, unopened)
+    
+    # Apply ordering based on newest parameter
+    if newest:
+        query = query.order_by(Bag.id.desc())
+    else:
+        query = query.order_by(Bag.id.asc())
+    
+    # Add secondary ordering by location
+    query = query.order_by(Bag.location)
+    bags = query.all()
+    
+    buffer = create_bag_inventory_pdf(bags)
+    buffer.seek(0)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'bag_inventory_{timestamp}.pdf'
+    
+    return send_file(
+        buffer,
+        mimetype='application/pdf',
+        download_name=filename
+    )
+
+def create_bag_inventory_pdf(bags):
+    buffer = BytesIO()
+    doc = canvas.Canvas(buffer, pagesize=letter)
+    margin = 0.5 * inch
+    
+    # Start first page
+    y = start_new_page(doc, title="Bag Inventory")
+    
+    # Print each bag's details
+    for bag in bags:
+        if y < (margin + 80):
+            doc.showPage()
+            y = start_new_page(doc, title="Bag Inventory")
+            
+        # Bag header with ID and status
+        status = "CONSUMED" if bag.consumed_date else "AVAILABLE"
+        header = f"Bag {bag.id} - {status}"
+        y = align_text(doc, header, y=y, margin=margin+20, font_name="Helvetica-Bold", font_size=12)
+        
+        # Bag details
+        y = draw_wrapped_text(doc, f"Contents: {bag.contents}", margin + 40, y)
+        y = draw_wrapped_text(doc, f"Location: {bag.location or 'Unspecified'}", margin + 40, y)
+        y = draw_wrapped_text(doc, f"Weight: {bag.weight}g", margin + 40, y)
+        
+        if bag.water_needed:
+            w = bag.water_needed
+            water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
+            y = draw_wrapped_text(doc, f"Water Needed: about {water_needed}", margin + 40, y)
+            
+        if bag.notes:
+            y = draw_wrapped_text(doc, f"Notes: {bag.notes}", margin + 40, y)
+            
+        if bag.consumed_date:
+            consumed_date = bag.consumed_date.strftime('%Y-%m-%d')
+            y = draw_wrapped_text(doc, f"Consumed: {consumed_date}", margin + 40, y)
+            
+        y -= 20  # Extra space between bags
+    
+    doc.save()
+    return buffer
 
 
 if __name__ == '__main__':
