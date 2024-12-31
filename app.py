@@ -239,19 +239,15 @@ def add_bag(tray_id):
         water_needed = round(water_needed, 1)
 
         # Query all bag IDs for the current batch
-        all_bag_ids = (
-            db.session.execute(db.select(Bag.id).filter(Bag.batch_id == tray.batch_id))
-            .scalars()
-            .all()
-        )
-        all_bag_ids = [bag_id[0] for bag_id in all_bag_ids]  # Flatten the list
-
-        # Extract the numerical parts after the "-" and sort numerically
-        used_numbers = [
-            int(bag_id.split("-")[1]) for bag_id in all_bag_ids if "-" in bag_id
-        ]
-        next_number = max(used_numbers, default=0) + 1  # Get the next number
-
+        existing_bags = db.session.query(Bag.id).filter(Bag.batch_id == tray.batch_id).all()
+        used_numbers = []
+        for bag_id, in existing_bags:
+            try:
+                if '-' in bag_id:
+                    used_numbers.append(int(bag_id.split('-')[1]))
+            except ValueError:
+                continue
+        next_number = max(used_numbers, default=0) + 1
         bag_id = f"{tray.batch_id:08d}-{next_number:02d}"
 
         bag = Bag(
@@ -737,9 +733,7 @@ def list_batches():
 def list_bags():
     id = request.args.get("id")
     page = int(request.form.get("page", 1))
-    search_query = request.cookies.get(
-        "bag_search", request.form.get("search", "")
-    ).strip()
+    search_query = request.cookies.get("bag_search", request.form.get("search", "")).strip()
     date_from = request.cookies.get("bag_date_from", request.form.get("date_from"))
     date_to = request.cookies.get("bag_date_to", request.form.get("date_to"))
 
@@ -749,35 +743,34 @@ def list_bags():
     newest = newest_form == "on" if newest_form is not None else newest_cookie == "true"
     if newest_form is None and newest_cookie is None:
         newest = True  # Default value for fresh visits
+    
     unopened_form = request.form.get("unopened")
     unopened_cookie = request.cookies.get("bag_unopened")
-    unopened = (
-        unopened_form == "on"
-        if unopened_form is not None
-        else unopened_cookie == "true"
-    )
+    unopened = unopened_form == "on" if unopened_form is not None else unopened_cookie == "true"
     if unopened_form is None and unopened_cookie is None:
         unopened = False  # Default value for fresh visits
 
     # Base query
     query = search_bags(search_query, date_from, date_to, unopened)
-    if newest:
-        query = query.order_by(Bag.id.desc())
-    else:
-        query = query.order_by(Bag.id.asc())
-    query = query.order_by(Bag.created_date.desc())
-    bag_count = query.count()
-
+    
     # Find the page containing the specified bag id
     if id is not None:
         bags = query.order_by(Bag.id.desc()).all()
-        bag_ids = [bag.id for bag in all_bags]
+        bag_ids = [bag.id for bag in bags]
         if id in bag_ids:
             bag_index = bag_ids.index(id)
             page = (bag_index // PER_PAGE) + 1
 
+    if newest:
+        query = query.order_by(Bag.id.desc())
+    else:
+        query = query.order_by(Bag.id.asc())
+        
+    query = query.order_by(Bag.created_date.desc())
+    bag_count = query.count()
+
     # Paginate the filtered results
-    pagination = query.order_by(Bag.id.desc()).paginate(page=page, per_page=PER_PAGE)
+    pagination = query.paginate(page=page, per_page=PER_PAGE)
     bags = pagination.items
 
     return render_template(
