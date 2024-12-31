@@ -1310,8 +1310,7 @@ def create_bag_inventory_pdf(bags):
 
         if bag.water_needed:
             w = bag.water_needed
-            water_needed = f"{water_volume_metric(
-                w)} ({water_volume_imperial(w)})"
+            water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
             y = draw_wrapped_text(
                 doc, f"Water Needed: about {water_needed}", margin + 40, y
             )
