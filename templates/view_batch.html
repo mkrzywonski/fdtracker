@@ -16,7 +16,7 @@
             class="btn btn-dark flex-fill bi bi-card-list"><i class="bi bi-arrow-left"></i></a>
         <a href="{{ url_for('edit_batch', id=batch.id) }}" type="button"
             class="btn btn-dark flex-fill bi bi-pencil-square"></a>
-        <button type="button" class="btn btn-dark flex-fill bi bi-printer"></button>
+        <a href="{{ url_for('batch_report', id=batch.id) }}" target="_blank" class="btn btn-dark flex-fill bi bi-printer"></a>
     </div>
 
     {# Notes #}
@@ -34,6 +34,15 @@
     {% if batch.status == 'In Progress' %}
     {# Enter final tray weights for batch in progrss #}
     <form method="POST" action="{{ url_for('update_weight', batch_id=batch.id) }}">
+        {% if error_messages %}
+        <div class="alert alert-danger">
+            <ul>
+                {% for error in error_messages %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
 
         {# Tray List #}
         <div class="card border border-dark mb-3">
@@ -198,7 +207,7 @@
                 class="btn btn-dark bi bi-plus-lg border border-light me-4"></a>
         </div>
         <div class="card-body">
-            {% if batch.photos.all()|length > 0 %}
+            {% if batch.photos|length > 0 %}
             {% for photo in batch.photos %}
 
             {# Photo Card #}
