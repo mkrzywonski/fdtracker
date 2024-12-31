@@ -695,9 +695,7 @@ def create_backup():
         backup,
         mimetype="application/zip",
         as_attachment=True,
-        download_name=f'fdtracker_backup_{
-            datetime.now().strftime("%Y%m%d")}.zip',
-    )
+        download_name=f'fdtracker_backup_{datetime.now().strftime("%Y%m%d")}.zip',)
 
 
 @app.route("/restore", methods=["GET", "POST"])
