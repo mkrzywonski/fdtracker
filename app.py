@@ -51,15 +51,17 @@ from pdf_helpers import (
     draw_image
 )
 
+# Constants
+PER_PAGE = 25
+UPLOAD_FOLDER = 'static/uploads'
+
 # Flask app configuration
 app = Flask(__name__)
 app.config.update({
     'SQLALCHEMY_DATABASE_URI': 'sqlite:///freezedry.db',
-    'UPLOAD_FOLDER': 'static/uploads'
+    'UPLOAD_FOLDER': UPLOAD_FOLDER
 })
 
-# Constants
-PER_PAGE = 25
 
 # Load configuration file
 config = configparser.ConfigParser()
