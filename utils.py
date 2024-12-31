@@ -12,7 +12,6 @@ from sqlalchemy import or_
 from models import Batch, Tray, Bag
 
 
-
 def water_volume_imperial(grams):
     ounces = grams / 29.5735  # 1 fl oz = 29.5735g water
     if ounces < 8:
@@ -56,8 +55,16 @@ def validate_backup_contents(zip_file):
         if file_path == "freezedry.db":
             content = zip_file.read(file_path)
             mime = magic.from_buffer(content, mime=True)
-            if mime != "application/x-sqlite3":
-                return False, "Invalid database file format"
+            # Valid SQLite MIME types across different platforms
+            if mime not in {
+                "application/x-sqlite3",
+                "application/vnd.sqlite3",
+                "application/sqlite3",
+                "application/x-sqlite",
+                "application/db",
+                "application/sqlite"
+            }:
+                return False, f"Invalid database file format '{mime}'"
 
         elif file_path == "manifest.json":
             continue
