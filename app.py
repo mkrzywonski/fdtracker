@@ -1045,15 +1045,12 @@ def create_batch_pdf(batch=None, batches=[]):
                            y=y, margin=margin + 160)
             if tray.ending_weight is not None:
                 w = tray.starting_weight - tray.ending_weight
-                water_removed = f"{water_volume_metric(
-                    w)} ({water_volume_imperial(w)})"
+                water_removed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
                 align_text(doc, "Water Removed:", y=y, margin=margin + 60)
-                y = align_text(doc, f"{water_removed}",
-                               y=y, margin=margin + 160)
+                y = align_text(doc, f"{water_removed}",y=y, margin=margin + 160)
             else:
                 align_text(doc, "Water Removed:", y=y, margin=margin + 60)
-                y = align_text(doc, "Not yet measured",
-                               y=y, margin=margin + 160)
+                y = align_text(doc, "Not yet measured", y=y, margin=margin + 160)
             if tray.notes:
                 y -= 5
                 y = draw_wrapped_text(
@@ -1100,8 +1097,7 @@ def create_batch_pdf(batch=None, batches=[]):
             y = align_text(doc, f"{bag.weight}g", y=y, margin=margin + 150)
             align_text(doc, "Water Needed:", y=y, margin=margin + 60)
             w = bag.water_needed
-            water_needed = f"{water_volume_metric(
-                w)} ({water_volume_imperial(w)})"
+            water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
             y = align_text(
                 doc, f"about {water_needed}", y=y, margin=margin + 150)
             if bag.notes:
