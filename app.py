@@ -690,8 +690,10 @@ def create_backup():
 
     for file in backup_files:
         with open(file, "rb") as f:
-            backup_hasher.update(f.read())
-            file_hash = hashlib.sha256(f.read()).hexdigest()
+            file_data = f.read()
+            backup_hasher.update(file_data)
+            file_hash = hashlib.sha256(file_data).hexdigest()
+
             manifest["files"].append(
                 {"name": os.path.basename(file), "hash": file_hash}
             )
@@ -736,8 +738,9 @@ def restore_backup():
                 return render_template("restore_backup.html")
 
             manifest = json.loads(zip_file.read("manifest.json"))
+            manifest_hashes = {file_entry["name"]: file_entry["hash"] for file_entry in manifest["files"]}
             expected_files = {file_entry["name"]
-                              for file_entry in manifest_data["files"]}
+                              for file_entry in manifest["files"]} | {"manifest.json"}
             missing_files = expected_files - found_files
             extra_files = found_files - expected_files
 
@@ -754,31 +757,32 @@ def restore_backup():
                 return render_template("restore_backup.html")
 
             # Verify hashes
-            for filename in expected_files:
-                file_data = zip_file.read(filename)
-                backup_hasher.update(file_data)
-                actual_hash = hashlib.sha256(file_data).hexdigest()
-                if actual_hash != manifest_hashes[filename]:
-                    flash(f"Hash mismatch for file {filename}", "danger")
-                    return redirect(url_for("list_batches"))
-                if filename == "freezedry.db":
-                    mime = magic.from_buffer(file_data, mime=True)
-                    # Valid SQLite MIME types across different platforms
-                    if mime not in {
-                        "application/x-sqlite3",
-                        "application/vnd.sqlite3",
-                        "application/sqlite3",
-                        "application/x-sqlite",
-                        "application/db",
-                        "application/sqlite"
-                    }:
-                        flash(f"Invalid database file type: {mime}", "danger")
-                        return render_template("restore_backup.html")
-                else:
-                    mime = magic.from_buffer(file_data, mime=True)
-                    if not mime.startswith("image/"):
-                        flash(f"Invalid file type: {mime}", "danger")
-                        return render_template("restore_backup.html")
+            for filename, manifest_hash in manifest_hashes.items():
+                if filename != "manifest.json":
+                    file_data = zip_file.read(filename)
+                    backup_hasher.update(file_data)
+                    actual_hash = hashlib.sha256(file_data).hexdigest()
+                    if actual_hash != manifest_hash:
+                        flash(f"Hash mismatch for file {filename} manifest: {manifest_hash} file: {actual_hash}", "danger")
+                        return redirect(url_for("list_batches"))
+                    if filename == "freezedry.db":
+                        mime = magic.from_buffer(file_data, mime=True)
+                        # Valid SQLite MIME types across different platforms
+                        if mime not in {
+                            "application/x-sqlite3",
+                            "application/vnd.sqlite3",
+                            "application/sqlite3",
+                            "application/x-sqlite",
+                            "application/db",
+                            "application/sqlite"
+                        }:
+                            flash(f"Invalid database file type: {mime}", "danger")
+                            return render_template("restore_backup.html")
+                    else:
+                        mime = magic.from_buffer(file_data, mime=True)
+                        if not mime.startswith("image/"):
+                            flash(f"Invalid file type: {mime}", "danger")
+                            return render_template("restore_backup.html")
 
             backup_hash = backup_hasher.hexdigest()
             if backup_hash != manifest["hash"]:
