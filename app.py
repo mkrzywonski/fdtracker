@@ -742,13 +742,11 @@ def restore_backup():
             extra_files = found_files - expected_files
 
             if missing_files:
-                flash(f"Missing files in backup: {
-                      ', '.join(missing_files)}", "danger")
+                flash(f"Missing files in backup: {', '.join(missing_files)}", "danger")
                 return render_template("restore_backup.html")
 
             if extra_files:
-                flash(f"Extra files in backup: {
-                      ', '.join(extra_files)}", "danger")
+                flash(f"Extra files in backup: {', '.join(extra_files)}", "danger")
                 return render_template("restore_backup.html")
 
             if "freezedry.db" not in found_files:
@@ -787,13 +785,14 @@ def restore_backup():
                 flash("Invalid database file: Hash mismatch!", "danger")
                 return render_template("restore_backup.html")
 
-            ### Everything is good, proceed with restoration
+            # Everything is good, proceed with restoration
             # Close database connections
             db.session.remove()
             db.engine.dispose()
 
             # Get database path
-            db_path = os.path.join(app.instance_path, app.config["SQLALCHEMY_DATABASE_URI"].replace("sqlite:///", ""))
+            db_path = os.path.join(
+                app.instance_path, app.config["SQLALCHEMY_DATABASE_URI"].replace("sqlite:///", ""))
 
             # Delete existing database
             if os.path.exists(db_path):
@@ -1041,8 +1040,7 @@ def create_batch_pdf(batch=None, batches=[]):
         y = align_text(
             doc, f"{batch.start_date.strftime('%Y-%m-%d')}", y=y, margin=margin + 100
         )
-        end_date_text = (f"{batch.end_date.strftime(
-            '%Y-%m-%d')}" if batch.end_date else "N/A")
+        end_date_text = (f"{batch.end_date.strftime('%Y-%m-%d')}" if batch.end_date else "N / A")
         align_text(doc, "End Date:", y=y, margin=margin + 20)
         y = align_text(doc, f"{end_date_text}", y=y, margin=margin + 100)
         align_text(doc, "Status:", y=y, margin=margin + 20)
@@ -1095,8 +1093,7 @@ def create_batch_pdf(batch=None, batches=[]):
                            y=y, margin=margin + 160)
             if tray.ending_weight is not None:
                 w = tray.starting_weight - tray.ending_weight
-                water_removed = f"{water_volume_metric(
-                    w)} ({water_volume_imperial(w)})"
+                water_removed = f"{water_volume_metric(w)}({water_volume_imperial(w)})"
                 align_text(doc, "Water Removed:", y=y, margin=margin + 60)
                 y = align_text(doc, f"{water_removed}",
                                y=y, margin=margin + 160)
@@ -1153,8 +1150,7 @@ def create_batch_pdf(batch=None, batches=[]):
                 y = align_text(doc, f"{bag.weight}g", y=y, margin=margin + 150)
                 align_text(doc, "Water Needed:", y=y, margin=margin + 60)
                 w = bag.water_needed
-                water_needed = f"{water_volume_metric(
-                    w)} ({water_volume_imperial(w)})"
+                water_needed = f"{water_volume_metric(w)}({water_volume_imperial(w)})"
                 y = align_text(
                     doc, f"about {water_needed}", y=y, margin=margin + 150)
                 if bag.notes:
@@ -1297,8 +1293,7 @@ def create_bag_location_inventory_pdf(bags):
                 y=y,
                 margin=margin + 200,
             )
-            y = align_text(doc, f"Weight: {
-                           bag.weight}g", y=y, margin=margin + 350)
+            y = align_text(doc, f"Weight: {bag.weight}g", y=y, margin=margin + 350)
             y = draw_wrapped_text(
                 doc, f"Contents: {bag.contents}", margin + 40, y)
             if bag.notes:
@@ -1377,8 +1372,7 @@ def create_bag_inventory_pdf(bags):
 
         if bag.water_needed:
             w = bag.water_needed
-            water_needed = f"{water_volume_metric(
-                w)} ({water_volume_imperial(w)})"
+            water_needed = f"{water_volume_metric(w)}({water_volume_imperial(w)})"
             y = draw_wrapped_text(
                 doc, f"Water Needed: about {water_needed}", margin + 40, y
             )
