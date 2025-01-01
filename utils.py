@@ -28,59 +28,6 @@ def water_volume_metric(grams):
         return f"{grams/1000:.1f}L"
     return f"{grams:.0f}ml"
 
-
-def calculate_backup_hash(db_path, image_files):
-    hasher = hashlib.sha256()
-    with open(db_path, "rb") as f:
-        hasher.update(f.read())
-    for image_file in sorted(image_files):
-        with open(image_file, "rb") as f:
-            hasher.update(f.read())
-    return hasher.hexdigest()
-
-
-def validate_backup_contents(zip_file):
-    """Validate all files in the backup archive"""
-    valid_files = {"freezedry.db", "manifest.json"}
-    uploads_prefix = "static/uploads/"
-
-    # Check that all required files exist
-    found_files = set(name for name in zip_file.namelist() if "/" not in name)
-    missing_files = valid_files - found_files
-    if missing_files:
-        return False, f"Missing required files: {', '.join(missing_files)}"
-
-    # Validate each file
-    for file_path in zip_file.namelist():
-        if file_path == "freezedry.db":
-            content = zip_file.read(file_path)
-            mime = magic.from_buffer(content, mime=True)
-            # Valid SQLite MIME types across different platforms
-            if mime not in {
-                "application/x-sqlite3",
-                "application/vnd.sqlite3",
-                "application/sqlite3",
-                "application/x-sqlite",
-                "application/db",
-                "application/sqlite"
-            }:
-                return False, f"Invalid database file format '{mime}'"
-
-        elif file_path == "manifest.json":
-            continue
-
-        elif file_path.startswith(uploads_prefix) and file_path.lower().endswith(".webp"):
-            content = zip_file.read(file_path)
-            mime = magic.from_buffer(content, mime=True)
-            if mime not in ("image/webp"):
-                return False, f"Invalid image format: {file_path}"
-
-        else:
-            return False, f"Unexpected file in backup: {file_path}"
-
-    return True, None
-
-
 def search_batches(search_query, date_from, date_to):
     # Base query
     query = Batch.query.distinct()

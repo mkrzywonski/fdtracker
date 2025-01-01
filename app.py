@@ -37,8 +37,6 @@ from models import Bag, Batch, Tray, Photo, db
 from utils import (
     water_volume_imperial,
     water_volume_metric,
-    calculate_backup_hash,
-    validate_backup_contents,
     search_batches,
     search_bags,
 )
@@ -261,7 +259,8 @@ def add_bag(id):
         water_needed = round(water_needed, 1)
 
         # Query all bag IDs for the current batch
-        existing_bags = db.session.query(Bag.id).filter(Bag.batch_id == tray.batch.id).all()
+        existing_bags = db.session.query(Bag.id).filter(
+            Bag.batch_id == tray.batch.id).all()
         used_numbers = []
         for bag_id, in existing_bags:
             try:
@@ -367,7 +366,7 @@ def edit_batch(id):
                 os.remove(file_path)
             db.session.delete(photo)
         db.session.commit()
-        return redirect(url_for("list_batches", id=batch.id))
+        return redirect(url_for("view_batch", id=batch.id))
 
     return render_template("edit_batch.html", batch=batch)
 
@@ -668,38 +667,41 @@ def print_label(id):
 
 @app.route("/backup")
 def create_backup():
-    db_path = os.path.join(app.instance_path, "freezedry.db")
+    db_file = os.path.join(
+        app.instance_path, app.config["SQLALCHEMY_DATABASE_URI"].replace("sqlite:///", ""))
+    manifest = {
+        "timestamp": datetime.now().isoformat(),
+        "files": [],
+    }
+    backup_files = [db_file]
+    backup_hasher = hashlib.sha256()
+
+    # Get list of image files from database
+    photos = db.session.query(Photo.filename).all()
+    for photo, in photos:
+        file_path = os.path.join(UPLOAD_FOLDER, photo)
+        if os.path.exists(file_path):
+            backup_files.append(file_path)
 
     # Quiesce database
     db.session.commit()
     db.session.remove()
     db.engine.dispose()
 
-    # Get list of image files
-    image_files = []
-    for root, _, files in os.walk(UPLOAD_FOLDER):
-        for file in files:
-            if file.lower().endswith(".webp"):
-                image_files.append(os.path.join(root, file))
+    for file in backup_files:
+        with open(file, "rb") as f:
+            backup_hasher.update(f.read())
+            file_hash = hashlib.sha256(f.read()).hexdigest()
+            manifest["files"].append(
+                {"name": os.path.basename(file), "hash": file_hash}
+            )
+    manifest["hash"] = backup_hasher.hexdigest()
 
-    # Calculate hash
-    backup_hash = calculate_backup_hash(db_path, image_files)
-
-    # Create backup with manifest
     backup = BytesIO()
     with ZipFile(backup, "w") as zip_file:
-        # Add database
-        zip_file.write(db_path, "freezedry.db")
-
-        # Add image files
-        for file_path in image_files:
-            arcname = os.path.relpath(file_path, start=".")
-            zip_file.write(file_path, arcname)
-
-        # Add manifest with hash
-        manifest = {"hash": backup_hash,
-                    "timestamp": datetime.now().isoformat()}
-        zip_file.writestr("manifest.json", json.dumps(manifest))
+        zip_file.writestr("manifest.json", json.dumps(manifest, indent=4))
+        for file_path in backup_files:
+            zip_file.write(file_path, os.path.basename(file_path))
 
     backup.seek(0)
     return send_file(
@@ -715,66 +717,114 @@ def restore_backup():
         return render_template("restore_backup.html")
 
     if "backup_file" not in request.files:
-        return render_template("restore_backup.html", error="No backup file provided")
+        flash("No backup file provided", "danger")
+        return render_template("restore_backup.html")
 
     backup = request.files["backup_file"]
 
     if backup.filename == "":
-        return render_template("restore_backup.html", error="No file selected")
+        flash("No backup file selected", "danger")
+        return render_template("restore_backup.html")
 
     try:
         with ZipFile(backup, "r") as zip_file:
-            # Validate all files before extraction
-            is_valid, error_msg = validate_backup_contents(zip_file)
-            if not is_valid:
-                return render_template("restore_backup.html", error=error_msg)
+            found_files = set(name for name in zip_file.namelist())
+            backup_hasher = hashlib.sha256()
 
-            # Extract to temp directory for hash validation
-            zip_file.extractall("restore_temp")
+            if "manifest.json" not in found_files:
+                flash("Invalid backup file: no manifest", "danger")
+                return render_template("restore_backup.html")
 
-            # Read manifest
-            with open("restore_temp/manifest.json") as f:
-                manifest = json.load(f)
+            manifest = json.loads(zip_file.read("manifest.json"))
+            expected_files = {file_entry["name"]
+                              for file_entry in manifest_data["files"]}
+            missing_files = expected_files - found_files
+            extra_files = found_files - expected_files
 
-            # Get image files
-            image_files = []
-            for root, _, files in os.walk(UPLOAD_FOLDER):
-                for file in files:
-                    if file.lower().endswith(".webp"):
-                        image_files.append(os.path.join(root, file))
+            if missing_files:
+                flash(f"Missing files in backup: {
+                      ', '.join(missing_files)}", "danger")
+                return render_template("restore_backup.html")
 
-            # Verify hash
-            current_hash = calculate_backup_hash(
-                "restore_temp/freezedry.db", image_files)
-            if current_hash != manifest["hash"]:
-                return render_template(
-                    "restore_backup.html",
-                    error="Invalid backup: File verification failed",
-                )
+            if extra_files:
+                flash(f"Extra files in backup: {
+                      ', '.join(extra_files)}", "danger")
+                return render_template("restore_backup.html")
 
+            if "freezedry.db" not in found_files:
+                flash("Invalid backup file: no database", "danger")
+                return render_template("restore_backup.html")
+
+            # Verify hashes
+            for filename in expected_files:
+                file_data = zip_file.read(filename)
+                backup_hasher.update(file_data)
+                actual_hash = hashlib.sha256(file_data).hexdigest()
+                if actual_hash != manifest_hashes[filename]:
+                    flash(f"Hash mismatch for file {filename}", "danger")
+                    return redirect(url_for("list_batches"))
+                if filename == "freezedry.db":
+                    mime = magic.from_buffer(file_data, mime=True)
+                    # Valid SQLite MIME types across different platforms
+                    if mime not in {
+                        "application/x-sqlite3",
+                        "application/vnd.sqlite3",
+                        "application/sqlite3",
+                        "application/x-sqlite",
+                        "application/db",
+                        "application/sqlite"
+                    }:
+                        flash(f"Invalid database file type: {mime}", "danger")
+                        return render_template("restore_backup.html")
+                else:
+                    mime = magic.from_buffer(file_data, mime=True)
+                    if not mime.startswith("image/"):
+                        flash(f"Invalid file type: {mime}", "danger")
+                        return render_template("restore_backup.html")
+
+            backup_hash = backup_hasher.hexdigest()
+            if backup_hash != manifest["hash"]:
+                flash("Invalid database file: Hash mismatch!", "danger")
+                return render_template("restore_backup.html")
+
+            ### Everything is good, proceed with restoration
             # Close database connections
             db.session.remove()
             db.engine.dispose()
 
-            # Restore files
-            db_path = os.path.join(app.instance_path, "freezedry.db")
-            shutil.copy2("restore_temp/freezedry.db", db_path)
+            # Get database path
+            db_path = os.path.join(app.instance_path, app.config["SQLALCHEMY_DATABASE_URI"].replace("sqlite:///", ""))
 
-            # Handle uploads directory
+            # Delete existing database
+            if os.path.exists(db_path):
+                os.remove(db_path)
+
+            # Clear uploads directory
             if os.path.exists(UPLOAD_FOLDER):
                 shutil.rmtree(UPLOAD_FOLDER)
-            else:
-                os.makedirs(UPLOAD_FOLDER)
+            os.makedirs(UPLOAD_FOLDER)
 
-    except (BadZipFile, json.JSONDecodeError, KeyError):
-        return render_template(
-            "restore_backup.html", error="Invalid backup file format"
-        )
+            # Extract files from backup
+            for filename in zip_file.namelist():
+                if filename == "manifest.json":
+                    continue
+                elif filename == "freezedry.db":
+                    # Ensure instance directory exists
+                    os.makedirs(app.instance_path, exist_ok=True)
+                    # Extract database
+                    with zip_file.open(filename) as source, open(db_path, 'wb') as target:
+                        shutil.copyfileobj(source, target)
+                else:
+                    # Extract photos to uploads directory
+                    with zip_file.open(filename) as source, open(os.path.join(UPLOAD_FOLDER, filename), 'wb') as target:
+                        shutil.copyfileobj(source, target)
+
+    except Exception as e:
+        flash(f"Invalid backup file: {e.__class__.__name__}: {str(e)}", "danger")
+        return render_template("restore_backup.html")
     finally:
-        shutil.rmtree("restore_temp", ignore_errors=True)
-
-    # Reconnect to database
-    db.create_all()
+        # Reconnect to database
+        db.create_all()
 
     return redirect(url_for("list_batches"))
 
@@ -991,7 +1041,8 @@ def create_batch_pdf(batch=None, batches=[]):
         y = align_text(
             doc, f"{batch.start_date.strftime('%Y-%m-%d')}", y=y, margin=margin + 100
         )
-        end_date_text = (f"{batch.end_date.strftime('%Y-%m-%d')}" if batch.end_date else "N/A")
+        end_date_text = (f"{batch.end_date.strftime(
+            '%Y-%m-%d')}" if batch.end_date else "N/A")
         align_text(doc, "End Date:", y=y, margin=margin + 20)
         y = align_text(doc, f"{end_date_text}", y=y, margin=margin + 100)
         align_text(doc, "Status:", y=y, margin=margin + 20)
@@ -1044,12 +1095,15 @@ def create_batch_pdf(batch=None, batches=[]):
                            y=y, margin=margin + 160)
             if tray.ending_weight is not None:
                 w = tray.starting_weight - tray.ending_weight
-                water_removed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
+                water_removed = f"{water_volume_metric(
+                    w)} ({water_volume_imperial(w)})"
                 align_text(doc, "Water Removed:", y=y, margin=margin + 60)
-                y = align_text(doc, f"{water_removed}",y=y, margin=margin + 160)
+                y = align_text(doc, f"{water_removed}",
+                               y=y, margin=margin + 160)
             else:
                 align_text(doc, "Water Removed:", y=y, margin=margin + 60)
-                y = align_text(doc, "Not yet measured", y=y, margin=margin + 160)
+                y = align_text(doc, "Not yet measured",
+                               y=y, margin=margin + 160)
             if tray.notes:
                 y -= 5
                 y = draw_wrapped_text(
@@ -1090,14 +1144,17 @@ def create_batch_pdf(batch=None, batches=[]):
                     font_size=12,
                 )
                 align_text(doc, "Contents:", y=y, margin=margin + 60)
-                y = align_text(doc, f"{bag.contents}", y=y, margin=margin + 150)
+                y = align_text(doc, f"{bag.contents}",
+                               y=y, margin=margin + 150)
                 align_text(doc, "Location:", y=y, margin=margin + 60)
-                y = align_text(doc, f"{bag.location}", y=y, margin=margin + 150)
+                y = align_text(doc, f"{bag.location}",
+                               y=y, margin=margin + 150)
                 align_text(doc, "Weight:", y=y, margin=margin + 60)
                 y = align_text(doc, f"{bag.weight}g", y=y, margin=margin + 150)
                 align_text(doc, "Water Needed:", y=y, margin=margin + 60)
                 w = bag.water_needed
-                water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
+                water_needed = f"{water_volume_metric(
+                    w)} ({water_volume_imperial(w)})"
                 y = align_text(
                     doc, f"about {water_needed}", y=y, margin=margin + 150)
                 if bag.notes:
@@ -1122,7 +1179,8 @@ def create_batch_pdf(batch=None, batches=[]):
                     img = Image.open(img_path)
                     aspect = img.width / img.height
                     if aspect < 1:  # Tall image
-                        height = min(img.height, 500)  # Cap height at 500 points
+                        # Cap height at 500 points
+                        height = min(img.height, 500)
                         width = height * aspect
                     else:  # Wide or square image
                         width = 400
@@ -1239,7 +1297,8 @@ def create_bag_location_inventory_pdf(bags):
                 y=y,
                 margin=margin + 200,
             )
-            y = align_text(doc, f"Weight: {bag.weight}g", y=y, margin=margin + 350)
+            y = align_text(doc, f"Weight: {
+                           bag.weight}g", y=y, margin=margin + 350)
             y = draw_wrapped_text(
                 doc, f"Contents: {bag.contents}", margin + 40, y)
             if bag.notes:
@@ -1318,7 +1377,8 @@ def create_bag_inventory_pdf(bags):
 
         if bag.water_needed:
             w = bag.water_needed
-            water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
+            water_needed = f"{water_volume_metric(
+                w)} ({water_volume_imperial(w)})"
             y = draw_wrapped_text(
                 doc, f"Water Needed: about {water_needed}", margin + 40, y
             )
