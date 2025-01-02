@@ -111,9 +111,9 @@
                 <div class="d-flex gap-2 w-100 mb-3">
                     <span class="mb-2"></span>
                     <a href="{{ url_for('edit_tray', id=tray.id) }}"
-                        class="btn btn-secondary flex-fill bi bi-pencil-square"><span class="ms-3">Edit</span></a>
+                        class="btn btn-dark flex-fill bi bi-pencil-square"><span class="ms-3">Edit</span></a>
                     <a href="{{ url_for('add_bag', id=tray.id) }}"
-                        class="btn btn-secondary flex-fill bi bi-bag-plus"><span class="ms-3">Add Bag</span></a>
+                        class="btn btn-dark flex-fill bi bi-bag-plus"><span class="ms-3">Add Bag</span></a>
                     <span></span>
                 </div>
                 <div class="card-body">
@@ -153,15 +153,15 @@
                 <div class="d-flex gap-2 w-100 mb-3">
                     <span class="mb-2"></span>
                     <a href="{{ url_for('edit_bag', id=bag.id, next=request.path) }}"
-                        class="btn btn-secondary flex-fill bi bi-pencil-square"><span class="ms-3">Edit</span></a>
-                    <a href="{{ url_for('print_label', id=bag.id) }}" class="btn btn-secondary flex-fill bi bi-printer"
+                        class="btn btn-dark flex-fill bi bi-pencil-square"><span class="ms-3">Edit</span></a>
+                    <a href="{{ url_for('print_label', id=bag.id) }}" class="btn btn-dark flex-fill bi bi-printer"
                         target="_blank">
                         <span class="ms-3">Label</span>
                     </a>
                     {% if not bag.consumed_date %}
                     <form method="POST" action="{{ url_for('consume_bag', id=bag.id, next=request.path) }}"
                         style="display: inline;">
-                        <button type="submit" class="btn btn-secondary flex-fill bi bi-bag-x">
+                        <button type="submit" class="btn btn-dark flex-fill bi bi-bag-x">
                             <span class="ms-3">Consume</span>
                         </button>
                     </form>
