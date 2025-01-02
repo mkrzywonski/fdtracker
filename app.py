@@ -908,12 +908,12 @@ def manage_snapshots():
 
             if created:            
                 path = os.path.join(snapshot_dir, filename)
-                size = os.path.getsize(path) / (1024 * 1024)  # Convert to MB
+                size = format_bytes_size(os.path.getsize(path))
                 snapshots.append({
                     'filename': filename,
                     'created': created,
                     'comment': comment,
-                    'size': f"{size:.1f} MB"
+                    'size': size
                 })
     
     # Sort snapshots by creation time, newest first

@@ -26,34 +26,39 @@
 
 <!-- Snapshots Table -->
 <div class="card border border-dark mb-4">
-    <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
-        <span class="me-3" style="width: 200px;">Created</span>
-        <span class="flex-grow-1">Comment</span>
-        <span class="me-3" style="width: 150px;">Size</span>
-        <span class="me-3" style="width: 150px;">Action</span>
+    <div class="card-header bg-dark text-white">
+        Snapshots
     </div>
     <div class="card-body">
         {% if snapshots %}
         {% for snapshot in snapshots %}
-        <div class="d-flex align-items-start justify-content-between border border-dark mb-3">
-            <form method="post" class="d-flex align-items-start justify-content-between w-100">
-                <input type="hidden" name="filename" value="{{ snapshot.filename }}">
-                <div class="me-3" style="width: 200px; word-wrap: break-word;">{{ snapshot.created }}</div>
-                <div class="flex-grow-1 me-3" style="word-wrap: break-word;">{{ snapshot.comment }}</div>
-                <div class="me-3" style="width: 150px; word-wrap: break-word;">{{ snapshot.size }}</div>
-                <div class="me-3" style="width: 150px;">
-                    <button type="submit" name="restore_snapshot"
-                        class="btn btn-dark btn-sm bi-file-earmark me-2 my-2 flex-nowrap" style="width: 125px;"
-                        onclick="return confirm('Are you sure you want to restore this snapshot? This will overwrite current data.')">
-                        <span><i class="bi bi-arrow-right" style="margin-left: -15px;"></i><i class="bi bi-database"
-                                style="margin-left: -5px;"></i></span>
-                    </button>
-                    <button type="submit" name="delete_snapshot" class="btn btn-dark btn-sm bi-trash my-2 flex-nowrap"
-                        style="width: 125px;"
-                        onclick="return confirm('Are you sure you want to delete this snapshot?')">
-                    </button>
-                </div>
-            </form>
+        <div class="card border border-dark mb-4">
+            <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
+                <span>{{ snapshot.created }}</span>
+                <span>{{ snapshot.size }}</span>
+            </div>
+
+            <div class="card-body">
+                <form method="post">
+                    <input type="hidden" name="filename" value="{{ snapshot.filename }}">
+                    {# Snapshot action buttons #}
+                    <div class="d-flex gap-2 w-100">
+                        <button type="submit" name="restore_snapshot"
+                            class="btn btn-dark btn-sm bi-file-earmark me-2 my-2 flex-nowrap flex-fill" style="width: 125px;"
+                            onclick="return confirm('Are you sure you want to restore this snapshot? This will overwrite current data.')">
+                            <span><i class="bi bi-arrow-right" style="margin-left: -15px;"></i><i class="bi bi-database"
+                                    style="margin-left: -5px;"></i></span>
+                        </button>
+                        <button type="submit" name="delete_snapshot"
+                            class="btn btn-dark btn-sm bi-trash my-2 flex-nowrap flex-fill" style="width: 125px;"
+                            onclick="return confirm('Are you sure you want to delete this snapshot?')">
+                        </button>
+                    </div>
+                    {% if snapshot.comment %}
+                    <div class="flex-grow-1 me-3" style="word-wrap: break-word;">{{ snapshot.comment }}</div>
+                    {% endif %}
+                </form>
+            </div>
         </div>
         {% endfor %}
         {% else %}

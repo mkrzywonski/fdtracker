@@ -12,7 +12,7 @@
     <div class="card-body">
         <form method="POST" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data">
             <div class="alert alert-warning" style="display: none;" id="warning_message">
-                Warning: This will replace all current data with the backup data.
+                Warning: This will replace all current data with the backup data. A snapshot of the current database will automatically be created before the restore.
             </div>
             <div class="mb-3">
                 <label for="backup_file" class="btn btn-dark bi bi-upload"><span class="ms-3">Select File</span></label>
