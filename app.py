@@ -39,6 +39,7 @@ from utils import (
     water_volume_metric,
     search_batches,
     search_bags,
+    format_bytes_size,
 )
 from pdf_helpers import (
     align_text,
@@ -667,10 +668,18 @@ def print_label(id):
 
 @app.route("/backup")
 def create_backup():
+        return send_file(
+        create_backup_file("Backup requested by user"),
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f'fdtracker_backup_{datetime.now().strftime("%Y%m%d")}.zip',)
+
+def create_backup_file(comment=""):
     db_file = os.path.join(
         app.instance_path, app.config["SQLALCHEMY_DATABASE_URI"].replace("sqlite:///", ""))
     manifest = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "comment": comment,
         "files": [],
     }
     backup_files = [db_file]
@@ -706,27 +715,29 @@ def create_backup():
             zip_file.write(file_path, os.path.basename(file_path))
 
     backup.seek(0)
-    return send_file(
-        backup,
-        mimetype="application/zip",
-        as_attachment=True,
-        download_name=f'fdtracker_backup_{datetime.now().strftime("%Y%m%d")}.zip',)
+    return backup
+
 
 
 @app.route("/restore", methods=["GET", "POST"])
-def restore_backup():
-    if request.method == "GET":
-        return render_template("restore_backup.html")
+def restore_backup(snapshot=None):
+    if snapshot:
+        template = "snapshots.html"
+        backup = snapshot
+    else:
+        template = "restore_backup.html"
+        if request.method == "GET":
+            return render_template(template)
 
-    if "backup_file" not in request.files:
-        flash("No backup file provided", "danger")
-        return render_template("restore_backup.html")
+        if "backup_file" not in request.files:
+            flash("No backup file provided", "danger")
+            return render_template(template)
 
-    backup = request.files["backup_file"]
+        backup = request.files["backup_file"]
 
-    if backup.filename == "":
-        flash("No backup file selected", "danger")
-        return render_template("restore_backup.html")
+        if backup.filename == "":
+            flash("No backup file selected", "danger")
+            return render_template(template)
 
     try:
         with ZipFile(backup, "r") as zip_file:
@@ -735,7 +746,7 @@ def restore_backup():
 
             if "manifest.json" not in found_files:
                 flash("Invalid backup file: no manifest", "danger")
-                return render_template("restore_backup.html")
+                return render_template(template)
 
             manifest = json.loads(zip_file.read("manifest.json"))
             manifest_hashes = {file_entry["name"]: file_entry["hash"] for file_entry in manifest["files"]}
@@ -746,15 +757,15 @@ def restore_backup():
 
             if missing_files:
                 flash(f"Missing files in backup: {', '.join(missing_files)}", "danger")
-                return render_template("restore_backup.html")
+                return render_template(template)
 
             if extra_files:
                 flash(f"Extra files in backup: {', '.join(extra_files)}", "danger")
-                return render_template("restore_backup.html")
+                return render_template(template)
 
             if "freezedry.db" not in found_files:
                 flash("Invalid backup file: no database", "danger")
-                return render_template("restore_backup.html")
+                return render_template(template)
 
             # Verify hashes
             for filename, manifest_hash in manifest_hashes.items():
@@ -777,19 +788,30 @@ def restore_backup():
                             "application/sqlite"
                         }:
                             flash(f"Invalid database file type: {mime}", "danger")
-                            return render_template("restore_backup.html")
+                            return render_template(template)
                     else:
                         mime = magic.from_buffer(file_data, mime=True)
                         if not mime.startswith("image/"):
                             flash(f"Invalid file type: {mime}", "danger")
-                            return render_template("restore_backup.html")
+                            return render_template(template)
 
             backup_hash = backup_hasher.hexdigest()
             if backup_hash != manifest["hash"]:
                 flash("Invalid database file: Hash mismatch!", "danger")
-                return render_template("restore_backup.html")
+                return render_template(template)
 
             # Everything is good, proceed with restoration
+
+            # Create a snapshot before wiping out the database
+            backup_dir = os.path.join("static", "snapshots")
+            os.makedirs(backup_dir, exist_ok=True)
+            snapshot = create_backup_file("Snapshot before restore")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"snapshot_{timestamp}.zip")
+            with open(backup_path, 'wb') as f:
+                f.write(snapshot.getvalue())
+            flash(f"Snapshot created", "info")
+
             # Close database connections
             db.session.remove()
             db.engine.dispose()
@@ -822,14 +844,84 @@ def restore_backup():
                     with zip_file.open(filename) as source, open(os.path.join(UPLOAD_FOLDER, filename), 'wb') as target:
                         shutil.copyfileobj(source, target)
 
+            flash("Backup restored successfully!", "success")
+
     except Exception as e:
         flash(f"Invalid backup file: {e.__class__.__name__}: {str(e)}", "danger")
-        return render_template("restore_backup.html")
+        return render_template(template)
     finally:
         # Reconnect to database
         db.create_all()
 
     return redirect(url_for("list_batches"))
+
+@app.route("/snapshots", methods=["GET", "POST"])
+def manage_snapshots():
+    snapshot_dir = os.path.join("static", "snapshots")
+    os.makedirs(snapshot_dir, exist_ok=True)
+    
+    if request.method == "POST":
+        if "create_snapshot" in request.form:
+            # Create new snapshot
+            comment = request.form.get("comment")
+            snapshot = create_backup_file(comment)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            snapshot_path = os.path.join(snapshot_dir, f"snapshot_{timestamp}.zip")
+            with open(snapshot_path, 'wb') as f:
+                f.write(snapshot.getvalue())
+            flash("New snapshot created successfully", "success")
+            
+        elif "delete_snapshot" in request.form:
+            # Delete selected snapshot
+            filename = request.form.get("filename")
+            if filename:
+                file_path = os.path.join(snapshot_dir, filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    flash(f"Snapshot {filename} deleted successfully", "success")
+                    
+        elif "restore_snapshot" in request.form:
+            filename = request.form.get("filename")
+            if filename:
+                file_path = os.path.join(snapshot_dir, filename)
+                if os.path.exists(file_path):
+                    with open(file_path, 'rb') as f:
+                        restore_backup(file_path)
+    
+    # Get list of snapshots with creation times
+    snapshots = []
+    for filename in os.listdir(snapshot_dir):
+        if filename.endswith('.zip'):
+            created = None
+            comment = ""
+            try:
+                with ZipFile(os.path.join(snapshot_dir,filename), "r") as zip_file:
+                    if "manifest.json" in zip_file.namelist():
+                        with zip_file.open("manifest.json") as manifest_file:
+                            manifest = json.load(manifest_file)
+                            created = manifest["timestamp"].split(".")[0]
+                            comment = manifest.get("comment", "")
+
+            except Exception as e:
+                        flash(f"Error loading manifest.json: {e}", "danger")
+
+
+            if created:            
+                path = os.path.join(snapshot_dir, filename)
+                size = os.path.getsize(path) / (1024 * 1024)  # Convert to MB
+                snapshots.append({
+                    'filename': filename,
+                    'created': created,
+                    'comment': comment,
+                    'size': f"{size:.1f} MB"
+                })
+    
+    # Sort snapshots by creation time, newest first
+    snapshots.sort(key=lambda x: x['created'], reverse=True)
+    total, used, free = shutil.disk_usage(snapshot_dir)
+    free_space = format_bytes_size(free)
+    
+    return render_template("snapshots.html", snapshots=snapshots, free_space=free_space)
 
 
 @app.route("/list_batches", methods=["GET", "POST"])
@@ -1393,6 +1485,7 @@ def create_bag_inventory_pdf(bags):
 
     doc.save()
     return buffer
+
 
 
 if __name__ == "__main__":

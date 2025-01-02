@@ -4,52 +4,54 @@
 <script>
     document.getElementById('page_title').textContent = 'Restore Backup';
 </script>
-<div class="container mt-4">
-    {% if error %}
-    <div class="alert alert-danger">
-        {{ error }}
-    </div>
-    {% endif %}
 
-    <div class="card border border-dark">
-        <div class="card-header bg-dark d-flex justify-content-between align-items-center">
-            <span class="text-white">Restore from backup file</span>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data">
-                <div class="mb-3">
-                    <div id="filename" class="mt-2 text-muted border">No file selected</div>
-                    <label for="backup_file" class="btn btn-secondary">Select Backup File</label>
-                    <input class="form-control form-control-sm" type="file" id="backup_file" name="backup_file"
-                        accept=".zip" style="display: none;" required onchange="enableUpload(this)">
-                </div>
-                <div class="alert alert-warning">
-                    Warning: This will replace all current data with the backup data.
-                </div>
-                <button type="submit" id="upload-button" class="btn btn-danger" disabled>Restore Backup</button>
-                <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
-            </form>
-        </div>
+<div class="card border border-dark mb-4">
+    <div class="card-header bg-dark text-white">
+        <span class="text-white">Restore from backup file</span>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data">
+            <div class="alert alert-warning" style="display: none;" id="warning_message">
+                Warning: This will replace all current data with the backup data.
+            </div>
+            <div class="mb-3">
+                <label for="backup_file" class="btn btn-dark bi bi-upload"><span class="ms-3">Select File</span></label>
+                <div id="filename" class="mt-2 text-muted border">No file selected</div>
+                <input class="form-control form-control-sm" type="file" id="backup_file" name="backup_file"
+                    accept=".zip" style="display: none;" required onchange="enableUpload(this)">
+            </div>
+            <button type="submit" id="upload-button" class="btn btn-secondary" disabled>Restore Backup</button>
+            <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
+        </form>
     </div>
 </div>
+
 <script>
     function enableUpload(input) {
         const uploadButton = document.getElementById('upload-button');
         const filenameDiv = document.getElementById('filename');
+        const warningMessage = document.getElementById('warning_message');
 
         if (input.files && input.files[0]) {
             // Show filename
             filenameDiv.textContent = input.files[0].name;
-            // Enable the upload button
-            uploadButton.classList.remove('btn-secondary');
-            uploadButton.classList.add('btn-primary');
+            filenameDiv.classList.remove('text-muted');
+            // Enable and style the upload button
             uploadButton.disabled = false;
+            uploadButton.classList.remove('btn-secondary');
+            uploadButton.classList.add('btn-dark');
+            // Show warning message
+            warningMessage.style.display = 'block';
         } else {
-            // Reset the preview and disable the upload button
-            filenameDiv.textContent = '';
-            uploadButton.classList.remove('btn-primary');
-            uploadButton.classList.add('btn-secondary');
+            // Reset the filename display
+            filenameDiv.textContent = 'No file selected';
+            filenameDiv.classList.add('text-muted');
+            // Disable and reset button style
             uploadButton.disabled = true;
+            uploadButton.classList.remove('btn-dark');
+            uploadButton.classList.add('btn-secondary');
+            // Hide warning message
+            warningMessage.style.display = 'none';
         }
     }
 </script>

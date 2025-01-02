@@ -97,3 +97,10 @@ def search_bags(search_query, date_from, date_to, unopened):
         )
 
     return query
+
+def format_bytes_size(bytes):
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if bytes < 1024:
+            return f"{bytes:.1f} {unit}"
+        bytes /= 1024
+    return f"{bytes:.1f} TB"
