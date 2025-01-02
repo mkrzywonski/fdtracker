@@ -8,16 +8,6 @@
 </script>
 
 <form method="POST">
-    {% if error_messages %}
-    <div class="alert alert-danger">
-        <ul>
-            {% for error in error_messages %}
-            <li>{{ error }}</li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-
     <div class="d-flex align-items-center gap-2 mb-3 ms-3">
         <label class="form-label text-nowrap mb-0">Number of Trays</label>
         <select name="tray_count" class="form-control w-auto" id="trayCount">

@@ -114,7 +114,7 @@ def root():
 def add_batch():
     if request.method == "POST":
         tray_count = int(request.form["tray_count"])
-        error_messages = []
+        batch_notes = request.form.get("batch_notes", "")
         trays = []
 
         # Validate tray weights and gather data
@@ -126,13 +126,11 @@ def add_batch():
             try:
                 starting_weight = float(starting_weight)
                 if starting_weight <= 0:
-                    error_messages.append(
-                        f"Tray {i + 1}: Initial weight must be greater than 0."
-                    )
+                    flash(f"Tray {i + 1}: Initial weight must be greater than 0.", "danger")
+                    return render_template("add_batch.html", tray_count=1, trays=[], batch_notes=batch_notes)
             except (ValueError, TypeError):
-                error_messages.append(
-                    f"Tray {i + 1}: Initial weight must be a valid number."
-                )
+                flash(f"Tray {i + 1}: Initial weight must be a valid number.", "danger")
+                return render_template("add_batch.html", tray_count=1, trays=[], batch_notes=batch_notes)
 
             # Append the entered data for each tray (preserving input even if invalid)
             trays.append(
@@ -144,16 +142,6 @@ def add_batch():
                     ),
                     "notes": notes,
                 }
-            )
-
-        # If there are errors, return the form with error messages and pre-filled data
-        if error_messages:
-            return render_template(
-                "add_batch.html",
-                error_messages=error_messages,
-                tray_count=tray_count,
-                trays=trays,
-                batch_notes=request.form.get("batch_notes", ""),
             )
 
         # Create a new batch
@@ -183,7 +171,6 @@ def complete_batch(id):
     if batch is None:
         flash(f"Batch {id} not found", "danger")
         return redirect(url_for("list_batches"))
-    error_messages = []
 
     # Validate weights for each tray
     for tray in batch.trays:
@@ -191,26 +178,14 @@ def complete_batch(id):
         try:
             ending_weight = float(ending_weight)
             if ending_weight <= 0:
-                error_messages.append(
-                    f"Tray {tray.position}: Final weight must be greater than 0."
-                )
+                flash(f"Tray {tray.position}: Final weight must be greater than 0.", "danger")
+                return render_template("view_batch.html", batch=batch)
             elif ending_weight > tray.starting_weight:
-                error_messages.append(
-                    f"Tray {tray.position}: Final weight cannot exceed the initial weight.")
+                flash(f"Tray {tray.position}: Final weight cannot exceed the initial weight.", "danger")
+                return render_template("view_batch.html", batch=batch)
         except (ValueError, TypeError):
-            error_messages.append(
-                f"Tray {tray.position}: Final weight must be a valid number."
-            )
-
-    # If there are validation errors, re-render the batch page with errors
-    if error_messages:
-        batch = db.session.get(Batch, id)
-        if batch is None:
-            flash(f"Batch {id} not found", "danger")
-            return redirect(url_for("list_batches"))
-        return render_template(
-            "view_batch.html", batch=batch, error_messages=error_messages
-        )
+            flash(f"Tray {tray.position}: Final weight must be a valid number.", "danger")
+            return render_template("view_batch.html", batch=batch)
 
     # Update tray weights and mark batch as complete
     for tray in batch.trays:
@@ -488,13 +463,15 @@ def add_photo(id):
 
     if request.method == "POST":
         if "photo" not in request.files:
-            return render_template("add_photo.html", batch=batch, error="No file part")
+            flash("No file part", "danger")
+            return render_template("add_photo.html", batch=batch)
 
         file = request.files["photo"]
         caption = request.form.get("caption", "")
 
         if file.filename == "":
-            return render_template("add_photo.html", batch=batch, error="No selected file")
+            flash("No selected file", "danger")
+            return render_template("add_photo.html", batch=batch)
 
         # Save the file temporarily for validation
         original_name = secure_filename(file.filename)
@@ -506,14 +483,16 @@ def add_photo(id):
             # Check file size
             if os.path.getsize(temp_path) > MAX_FILE_SIZE:
                 os.remove(temp_path)
-                return render_template("add_photo.html", batch=batch, error="File is too large (max 50MB)")
+                flash("File is too large (max 50MB)", "danger")
+                return render_template("add_photo.html", batch=batch)
 
             # Validate file type using MIME type
             mime = magic.Magic(mime=True)
             mime_type = mime.from_file(temp_path)
             if mime_type not in SUPPORTED_MIME_TYPES:
                 os.remove(temp_path)
-                return render_template("add_photo.html", batch=batch, error="Unsupported file type")
+                flash("Unsupported file type", "danger")
+                return render_template("add_photo.html", batch=batch)
 
             # Create a Photo entry in the database to get the photo ID
             photo = Photo(batch_id=batch.id, filename="temp", caption=caption)
@@ -774,8 +753,8 @@ def restore_backup(snapshot=None):
                     backup_hasher.update(file_data)
                     actual_hash = hashlib.sha256(file_data).hexdigest()
                     if actual_hash != manifest_hash:
-                        flash(f"Hash mismatch for file {filename} manifest: {manifest_hash} file: {actual_hash}", "danger")
-                        return redirect(url_for("list_batches"))
+                        flash(f"Hash mismatch for file {filename}", "danger")
+                        return render_template(template)
                     if filename == "freezedry.db":
                         mime = magic.from_buffer(file_data, mime=True)
                         # Valid SQLite MIME types across different platforms

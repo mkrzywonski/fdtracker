@@ -2,6 +2,10 @@ body {
     font-size: 1.4rem;
 }
 
+.alert {
+    font-size: 2.0rem !important;
+}
+
 .navbar-brand {
     font-size: 3.0rem !important;
 }

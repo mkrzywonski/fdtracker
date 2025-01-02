@@ -7,10 +7,6 @@
     document.getElementById('page_title').textContent = "Add Photo to Batch #{{ '%08d' % batch.id }}";
 </script>
 
-{% if error %}
-<div class="alert alert-danger">{{ error }}</div>
-{% endif %}
-
 <!-- Add Photo Card -->
 <div class="card border border-dark mb-4">
     <div class="card-header bg-dark text-white">
