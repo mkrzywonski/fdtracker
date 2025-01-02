@@ -47,7 +47,14 @@
             <!-- Navigation menu -->
             <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                 <ul class="navbar-nav flex-column align-items-end">
-                    <!-- View menu -->
+                    <!-- New Batch -->
+                    <li class="nav-item">
+                        <a href="{{ url_for('add_batch') }}" type="button"
+                        class="btn btn-dark flex-fill"><span>
+                        <i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i>
+                        <span class="mb-3">New Batch</span></span></a>
+                    </li>
+                        <!-- View menu -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="viewDropdown" role="button"
                             data-bs-toggle="dropdown" aria-expanded="false">
@@ -55,7 +62,7 @@
                         <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="viewDropdown">
                             <li>
                                 <a class="dropdown-item" href="{{ url_for('list_batches') }}">
-                                    {{ freezedryer_icon() }}
+                                    <i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i>
                                     Batches
                                 </a>
                             </li>

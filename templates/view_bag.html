@@ -15,7 +15,7 @@
         <a href="{{ url_for('list_bags', id=bag.id) }}" type="button" class="btn btn-dark flex-fill bi bi-card-list"><i
                 class="bi bi-arrow-left"></i></a>
         <a href="{{ url_for('view_batch', id=bag.batch.id, next=request.path) }}"
-            class="btn btn-dark flex-fill"><span>{{freezedryer_icon() }}<i class="bi bi-arrow-left" style="margin-left: -15px;"></i></span></a>
+            class="btn btn-dark flex-fill"><span><i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i><i class="bi bi-arrow-left" style="margin-left: -15px;"></i></span></a>
         <a href="{{ url_for('edit_bag', id=bag.id, next=request.path) }}"
             class="btn btn-dark flex-fill bi bi-pencil-square"><span class="ms-3"></span></a>
         <a href="{{ url_for('print_label', id=bag.id) }}" class="btn btn-dark flex-fill bi bi-printer"

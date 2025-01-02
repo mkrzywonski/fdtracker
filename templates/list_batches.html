@@ -62,8 +62,10 @@
 
         {# Batch list action buttons #}
         <div class="d-flex gap-2 w-100">
-            <a href="{{ url_for('add_batch') }}" type="button"
-                class="btn btn-dark flex-fill"><span></i>+{{ freezedryer_icon() }}</span><span class="mb-3">New Batch</span></a>
+            <a href="{{ url_for('add_batch') }}" type="button" class="btn btn-dark flex-fill">
+                <span><span style="margin-right: -8px;">+</span>
+                <i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i>
+                <span class="mb-3">New Batch</span></span></a>
                 <a href="{{ url_for('batch_report') }}" target="_blank" class="btn btn-dark flex-fill bi bi-printer"></a>
         </div>
 
