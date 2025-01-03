@@ -15,9 +15,9 @@
         <input type="number" id="page" name="page" value="{{ page|default(1) }}" hidden>
 
         {# Search Card #}
-        <div class="card border border-dark">
+        <div class="card border border-secondary">
             {# Search Card Header #}
-            <div class="card-header d-flex justify-content-between align-items-center bg-dark" role="button"
+            <div class="card-header d-flex justify-content-between align-items-center bg-secondary" role="button"
                 data-bs-toggle="collapse" data-bs-target="#searchCollapse" aria-expanded="false">
                 <span>
                     <i id="search_arrow" class="bi bi-caret-right-fill text-white"></i>
@@ -29,12 +29,11 @@
                     <span class="text-warning">(Filtered)</span>
                     {% endif %}
                 </span>
-
             </div>
             {# End of Search Card Header #}
 
             {# Search Card Body #}
-            <div class="collapse show" id="searchCollapse">
+            <div class="collapse" id="searchCollapse">
                 <div class="card-body">
                     <div class="d-flex gap-2 align-items-end">
                         <div class="flex-grow-1">
@@ -81,11 +80,11 @@
         <div class="col-12 mb-4">
 
             {# bag Card #}
-            <div class="card border border-dark mb-3">
-                <div class="card-header bg bg-dark mb-3">
+            <div class="card border border-success mb-5">
+                <div class="card-header bg bg-success mb-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="bag-name text-white">Bag #{{ bag.id }}</span>
-                        <span class="badge text-white {% if not bag.consumed_date %}bg-success{% else %}bg-dark{% endif %}">
+                        <span class="badge text-white {% if not bag.consumed_date %}bg-dark{% else %}bg-secondary{% endif %}">
                             {% if not bag.consumed_date %}
                             Created: {{ bag.created_date.strftime('%Y-%m-%d') }}
                             {% else %}
@@ -97,12 +96,14 @@
 
                 {# Action Buttons #}
                 <div class="d-flex gap-2 w-100">
+                    <span class="mb-3"></span>
                     <a href="{{ url_for('view_bag', id=bag.id, search_query=search_query) }}" type="button"
                         class="btn btn-dark flex-fill bi bi-eye"></a>
                     <a href="{{ url_for('edit_bag', id=bag.id, next=request.path) }}" type="button"
                         class="btn btn-dark flex-fill bi bi-pencil-square"></a>
-                    <a href="{{ url_for('print_label', id=bag.id) }}" type-"button" class="btn btn-dark flex-fill bi bi-printer"
+                    <a href="{{ url_for('print_label', id=bag.id) }}" type="button" class="btn btn-dark flex-fill bi bi-printer"
                         target="_blank"></a>
+                    <span></span>
                 </div>
 
                 {# bag Info #}
@@ -187,8 +188,8 @@
             document.querySelector('form').submit();
         }
 
-                // Add collapse state handler
-                document.getElementById('searchCollapse').addEventListener('show.bs.collapse', function () {
+            // Add collapse state handler
+            document.getElementById('searchCollapse').addEventListener('show.bs.collapse', function () {
             document.getElementById('search_arrow').classList.remove('bi-caret-right-fill');
             document.getElementById('search_arrow').classList.add('bi-caret-down-fill');
         });

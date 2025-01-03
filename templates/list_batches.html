@@ -16,9 +16,9 @@
         <input type="number" id="page" name="page" value="{{ page|default(1) }}" hidden>
 
         {# Search Card #}
-        <div class="card border border-dark">
+        <div class="card border border-secondary">
             {# Search Card Header #}
-            <div class="card-header d-flex justify-content-between align-items-center bg-dark" role="button"
+            <div class="card-header d-flex justify-content-between align-items-center bg-secondary" role="button"
                 data-bs-toggle="collapse" data-bs-target="#searchCollapse" aria-expanded="false">
                 <span>
                     <i id="search_arrow" class="bi bi-caret-right-fill text-white"></i>
@@ -74,8 +74,8 @@
         <div class="col-12 mb-4">
 
             {# Batch Card #}
-            <div class="card border border-dark mb-5">
-                <div class="card-header mb-1 bg bg-dark">
+            <div class="card border border-primary mb-5">
+                <div class="card-header mb-1 bg bg-primary mb-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="batch-name text-white">Batch #{{ '%08d' % batch.id }}</span>
                         {% if batch.end_date %}
