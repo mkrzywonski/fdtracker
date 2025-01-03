@@ -225,6 +225,12 @@ def add_bag(id):
         return redirect(url_for("list_batches"))
 
     if request.method == "POST":
+        another = request.form.get("another")
+        contents = request.form.get("contents", tray.contents)
+        weight = request.form.get("weight", tray.ending_weight)
+        location = request.form.get("location")
+        notes = request.form.get("notes")
+
         if tray.ending_weight is None or tray.ending_weight <= 0:
             tray.ending_weight = tray.starting_weight
         weight_loss_ratio = (
@@ -258,8 +264,22 @@ def add_bag(id):
         )
         db.session.add(bag)
         db.session.commit()
-        return redirect(url_for("view_batch", id=bag.batch.id))
-    return render_template("add_bag.html", tray=tray)
+        flash(f"Added Bag {bag_id}", "success")
+
+        if not another:
+            return redirect(url_for("view_batch", id=bag.batch.id))
+
+    else:
+        contents = tray.contents
+        weight = round(tray.starting_weight - tray.ending_weight, 1)
+        location = None
+        notes = None
+
+    return render_template("add_bag.html", tray=tray,
+                contents=contents,
+                weight=weight,
+                location=location,
+                notes=notes)
 
 
 @app.route("/delete_bag/<string:id>", methods=["POST"])
@@ -535,113 +555,130 @@ def add_photo(id):
 
 @app.route("/print_label/<string:id>")
 def print_label(id):
+    # First try to find a bag with this ID
     bag = db.session.get(Bag, id)
-    if bag is None:
-        flash(f"Bag {id} not found", "danger")
-        return redirect(url_for("list_bags"))
+    if bag:
+        bags = [bag]
+    else:
+        # If no bag found, try to parse as batch ID
+        try:
+            batch_id = int(id)
+            batch = db.session.get(Batch, batch_id)
+            if batch is None:
+                flash(f"Batch {id} not found", "danger")
+                return redirect(request.referrer or url_for("list_batches"))
+            bags = batch.bags
+            if not bags:
+                flash(f"No bags found in batch {id}", "warning")
+                return redirect(request.referrer or url_for("view_batch", id=batch_id))
+        except ValueError:
+            flash(f"Bag {id} not found", "danger")
+            return redirect(request.referrer or url_for("list_bags"))
 
-    # Create QR code with batch URL
-    batch_url = url_for("view_bag", id=bag.id, _external=True)
-    qr = qrcode.QRCode(version=1, box_size=10, border=4)
-    qr.add_data(batch_url)
-    qr.make(fit=True)
-    qr_img = qr.make_image(fill_color="black", back_color="white")
-
-    # Save QR code to memory
-    qr_buffer = BytesIO()
-    qr_img.save(qr_buffer)
-    qr_buffer.seek(0)
-
-    # Create PDF in memory
+    # Create PDF with multiple pages
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=(4 * inch, 6 * inch))
 
-    # Draw the border and line
-    c.setStrokeColor(colors.black)
-    c.setLineWidth(0.02 * inch)
-    c.roundRect(0.1 * inch, 0.1 * inch, 3.8 * inch, 5.8 * inch, 0.25 * inch)
-    c.line(0.1 * inch, 5.4 * inch, 3.9 * inch, 5.4 * inch)
+    for bag in bags:
+        # Create QR code with batch URL
+        batch_url = url_for("view_bag", id=bag.id, _external=True)
+        qr = qrcode.QRCode(version=1, box_size=10, border=4)
+        qr.add_data(batch_url)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white")
 
-    date_text = bag.batch.start_date.strftime("%Y-%m-%d")
-    align_text(
-        c,
-        f"Batch: {bag.batch.id:08d}",
-        y=5.55 * inch,
-        margin=0.3 * inch,
-        font_name="Helvetica-Bold",
-        font_size=14,
-    )
-    align_text(
-        c,
-        date_text,
-        "right",
-        y=5.55 * inch,
-        margin=0.3 * inch,
-        font_name="Helvetica-Bold",
-        font_size=14,
-        page_width=4,
-    )
+        # Save QR code to memory
+        qr_buffer = BytesIO()
+        qr_img.save(qr_buffer)
+        qr_buffer.seek(0)
 
-    # Add centered contents with text wrapping
-    from reportlab.lib.utils import simpleSplit
+        # Draw the border and line
+        c.setStrokeColor(colors.black)
+        c.setLineWidth(0.02 * inch)
+        c.roundRect(0.1 * inch, 0.1 * inch, 3.8 * inch, 5.8 * inch, 0.25 * inch)
+        c.line(0.1 * inch, 5.4 * inch, 3.9 * inch, 5.4 * inch)
 
-    c.setFont("Helvetica-Bold", 14)
-    text_width = 3.6 * inch  # Allowing for margins
-    wrapped_lines = simpleSplit(
-        bag.contents, c._fontname, c._fontsize, text_width)
-    y = 5.0 * inch  # 1 inch from top
-    for line in wrapped_lines:
-        text_length = c.stringWidth(line)
-        x = (4 * inch - text_length) / 2  # Center the text
-        c.drawString(x, y, line)
-        y -= 20  # Move down for next line
-
-    # Add details below contents
-    y -= 10  # Extra space after contents
-    c.setFont("Helvetica", 12)  # Switch to normal weight
-    x = 0.2 * inch  # Left margin
-
-    # Fixed details
-    y = align_text(c, f"Bag ID: {bag.id}", y=y, margin=x)
-    y = align_text(c, f"Freeze Dried Weight: {bag.weight}g", y=y, margin=x)
-    original_weight = round(bag.weight + bag.water_needed, 1)
-    y = align_text(c, f"Original Weight: ~{original_weight}g", y=y, margin=x)
-    w = bag.water_needed
-    water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
-    y = align_text(c, f"Water Needed: ~{water_needed}", y=y, margin=x)
-
-    # Wrapping text for location
-    if bag.location:
-        wrapped_location = simpleSplit(
-            f"Location: {bag.location}", c._fontname, c._fontsize, text_width
+        date_text = bag.batch.start_date.strftime("%Y-%m-%d")
+        align_text(
+            c,
+            f"Batch: {bag.batch.id:08d}",
+            y=5.55 * inch,
+            margin=0.3 * inch,
+            font_name="Helvetica-Bold",
+            font_size=14,
         )
-        for line in wrapped_location:
-            c.drawString(x, y, line)
-            y -= 15
-
-    # Wrapping text for notes
-    if bag.notes:
-        wrapped_notes = simpleSplit(
-            f"Notes: {bag.notes}", c._fontname, c._fontsize, text_width
+        align_text(
+            c,
+            date_text,
+            "right",
+            y=5.55 * inch,
+            margin=0.3 * inch,
+            font_name="Helvetica-Bold",
+            font_size=14,
+            page_width=4,
         )
-        for line in wrapped_notes:
-            c.drawString(x, y, line)
-            y -= 15
 
-    # Add QR code at bottom
-    qr_width = qr_height = 1 * inch
-    qr_x = (4 * inch - qr_width) / 2  # Center horizontally
-    qr_y = 0.2 * inch  # Position from bottom
-    c.drawImage(ImageReader(qr_buffer), qr_x, qr_y, qr_width, qr_height)
-    y = align_text(
-        c, f"{batch_url}", "center", y=0.175 * inch, font_size=8, page_width=4
-    )
+        # Add centered contents with text wrapping
+        c.setFont("Helvetica-Bold", 14)
+        text_width = 3.6 * inch
+        wrapped_lines = simpleSplit(bag.contents, c._fontname, c._fontsize, text_width)
+        y = 5.0 * inch
+        for line in wrapped_lines:
+            text_length = c.stringWidth(line)
+            x = (4 * inch - text_length) / 2
+            c.drawString(x, y, line)
+            y -= 20
+
+        # Add details below contents
+        y -= 10
+        c.setFont("Helvetica", 12)
+        x = 0.2 * inch
+
+        # Fixed details
+        y = align_text(c, f"Bag ID: {bag.id}", y=y, margin=x)
+        y = align_text(c, f"Freeze Dried Weight: {bag.weight}g", y=y, margin=x)
+        original_weight = round(bag.weight + bag.water_needed, 1)
+        y = align_text(c, f"Original Weight: ~{original_weight}g", y=y, margin=x)
+        w = bag.water_needed
+        water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
+        y = align_text(c, f"Water Needed: ~{water_needed}", y=y, margin=x)
+
+        # Wrapping text for location
+        if bag.location:
+            wrapped_location = simpleSplit(
+                f"Location: {bag.location}", c._fontname, c._fontsize, text_width
+            )
+            for line in wrapped_location:
+                c.drawString(x, y, line)
+                y -= 15
+
+        # Wrapping text for notes
+        if bag.notes:
+            wrapped_notes = simpleSplit(
+                f"Notes: {bag.notes}", c._fontname, c._fontsize, text_width
+            )
+            for line in wrapped_notes:
+                c.drawString(x, y, line)
+                y -= 15
+
+        # Add QR code at bottom
+        qr_width = qr_height = 1 * inch
+        qr_x = (4 * inch - qr_width) / 2
+        qr_y = 0.2 * inch
+        c.drawImage(ImageReader(qr_buffer), qr_x, qr_y, qr_width, qr_height)
+        y = align_text(
+            c, f"{batch_url}", "center", y=0.175 * inch, font_size=8, page_width=4
+        )
+
+        c.showPage()
 
     c.save()
     buffer.seek(0)
 
     return send_file(
-        buffer, download_name=f"bag_{bag.id}_label.pdf", mimetype="application/pdf"
+        buffer, 
+        download_name=f"labels_{id}.pdf", 
+        mimetype="application/pdf"
     )
 
 
