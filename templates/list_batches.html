@@ -51,7 +51,7 @@
                         <input class="form-control me-2 mt-3 border-dark text-dark" type="search" name="search"
                             placeholder="Search..." aria-label="Search"
                             value="{{ search_query if search_query else '' }}">
-                        <button class="btn btn-dark me-2 mt-3" type="submit">Search</button>
+                        <button class="btn btn-secondary border-dark me-2 mt-3" type="submit">Search</button>
                         <button class="btn btn-outline-dark me-2 mt-3" id="clear_search" type="button">Clear</button>
                     </div>
                 </div>
@@ -62,11 +62,11 @@
 
         {# Batch list action buttons #}
         <div class="d-flex gap-2 w-100">
-            <a href="{{ url_for('add_batch') }}" type="button" class="btn btn-dark flex-fill">
+            <a href="{{ url_for('add_batch') }}" type="button" class="btn btn-secondary border-primary flex-fill">
                 <span><span style="margin-right: -8px;">+</span>
                 <i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i>
                 <span class="mb-3">New Batch</span></span></a>
-                <a href="{{ url_for('batch_report') }}" target="_blank" class="btn btn-dark flex-fill bi bi-printer"></a>
+                <a href="{{ url_for('batch_report') }}" target="_blank" class="btn btn-secondary border-primary flex-fill bi bi-printer"></a>
         </div>
 
         {# Display batch list #}
@@ -94,10 +94,10 @@
                 <div class="d-flex gap-2 w-100">
                     <span class="mb-3"></span>
                     <a href="{{ url_for('view_batch', id=batch.id, search_query=search_query) }}" type="button"
-                        class="btn btn-dark flex-fill bi bi-eye"></a>
+                        class="btn btn-secondary border-primary flex-fill bi bi-eye"></a>
                     <a href="{{ url_for('edit_batch', id=batch.id) }}" type="button"
-                        class="btn btn-dark flex-fill bi bi-pencil-square"></a>
-                        <a href="{{ url_for('batch_report', id=batch.id) }}" target="_blank" class="btn btn-dark flex-fill bi bi-printer"></a>
+                        class="btn btn-secondary border-primary flex-fill bi bi-pencil-square"></a>
+                        <a href="{{ url_for('batch_report', id=batch.id) }}" target="_blank" class="btn btn-secondary border-primary flex-fill bi bi-printer"></a>
                     <span></span>
                 </div>
 
@@ -132,7 +132,7 @@
                     {% for page in pagination.iter_pages() %}
                     {% if page %}
                     <li class="page-item {% if page == pagination.page %}active{% endif %}">
-                        <button type="button" class="page-link btn btn-lg mx-3 border border-dark bg bg-dark"
+                        <button type="button" class="page-link btn btn-lg mx-3 border border-dark bg-dark"
                             onclick="setPage({{ page }})">{{ page }}</button>
                     </li>
                     {% else %}

@@ -9,9 +9,9 @@
 
 {# bag action buttons #}
 <div class="d-flex gap-2 w-100 mb-3">
-    <a href="{{ url_for('list_bags', id=bag.id) }}" type="button" class="btn btn-dark flex-fill bi bi-card-list"><i
+    <a href="{{ url_for('list_bags', id=bag.id) }}" type="button" class="btn btn-secondary border-success flex-fill bi bi-card-list"><i
             class="bi bi-arrow-left"></i></a>
-    <a href="{{ url_for('view_bag', id=bag.id) }}" type="button" class="btn btn-dark flex-fill bi bi-eye"><i
+    <a href="{{ url_for('view_bag', id=bag.id) }}" type="button" class="btn btn-secondary border-success flex-fill bi bi-eye"><i
             class="bi bi-arrow-left"></i></a>
 </div>
 
@@ -60,7 +60,7 @@
                 <label for="notes" class="form-label">Notes</label>
                 <textarea class="form-control" id="notes" name="notes" rows="3">{{ bag.notes }}</textarea>
             </div>
-            <button type="submit" class="btn btn-dark">Save Changes</button>
+            <button type="submit" class="btn btn-secondary border-success">Save Changes</button>
             <a href="{{ request.args.get('next', '/') }}" class="btn btn-secondary">Cancel</a>
         </form>
     </div>

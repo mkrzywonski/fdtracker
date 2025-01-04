@@ -15,7 +15,7 @@
                 Warning: This will replace all current data with the backup data. A snapshot of the current database will automatically be created before the restore.
             </div>
             <div class="mb-3">
-                <label for="backup_file" class="btn btn-dark bi bi-upload"><span class="ms-3">Select File</span></label>
+                <label for="backup_file" class="btn btn-secondary border-dark bi bi-upload"><span class="ms-3">Select File</span></label>
                 <div id="filename" class="mt-2 text-muted border">No file selected</div>
                 <input class="form-control form-control-sm" type="file" id="backup_file" name="backup_file"
                     accept=".zip" style="display: none;" required onchange="enableUpload(this)">
@@ -38,8 +38,8 @@
             filenameDiv.classList.remove('text-muted');
             // Enable and style the upload button
             uploadButton.disabled = false;
-            uploadButton.classList.remove('btn-secondary');
-            uploadButton.classList.add('btn-dark');
+            // uploadButton.classList.remove('btn-secondary');
+            // uploadButton.classList.add('btn-secondary border-dark');
             // Show warning message
             warningMessage.style.display = 'block';
         } else {
@@ -48,8 +48,8 @@
             filenameDiv.classList.add('text-muted');
             // Disable and reset button style
             uploadButton.disabled = true;
-            uploadButton.classList.remove('btn-dark');
-            uploadButton.classList.add('btn-secondary');
+            // uploadButton.classList.remove('btn-secondary border-dark');
+            // uploadButton.classList.add('btn-secondary');
             // Hide warning message
             warningMessage.style.display = 'none';
         }

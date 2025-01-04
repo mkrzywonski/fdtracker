@@ -15,7 +15,7 @@
     <div class="card-body">
         <form method="POST" enctype="multipart/form-data" action="{{ url_for('add_photo', id=batch.id) }}">
             <div class="mb-5">
-                <label for="photo" class="btn btn-dark bi bi-camera w-25"></label>
+                <label for="photo" class="btn btn-secondary border-dark bi bi-camera w-25"></label>
                 <input class="form-control form-control-sm" type="file" id="photo" name="photo" accept="image/*" style="display: none;" required onchange="previewImage(this)">
             </div>
             <div class="mb-3">
@@ -26,7 +26,7 @@
                 <img id="preview" src="" alt="Preview" style="max-width: 100%; display: none;" class="img-thumbnail">
             </div>
             <div class="card-footer">
-                <button type="submit" id="upload-button" class="btn btn-secondary" disabled>Upload</button>
+                <button type="submit" id="upload-button" class="btn btn-secondary border-dark" disabled>Upload</button>
                 <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
@@ -47,15 +47,15 @@ function previewImage(input) {
         reader.readAsDataURL(input.files[0]);
 
         // Enable the upload button
-        uploadButton.classList.remove('btn-secondary');
-        uploadButton.classList.add('btn-dark');
+        // uploadButton.classList.remove('btn-secondary');
+        // uploadButton.classList.add('btn-secondary border-dark');
         uploadButton.disabled = false;
     } else {
         // Reset the preview and disable the upload button
         preview.style.display = 'none';
         preview.src = '';
-        uploadButton.classList.remove('btn-dark');
-        uploadButton.classList.add('btn-secondary');
+        // uploadButton.classList.remove('btn-secondary border-dark');
+        // uploadButton.classList.add('btn-secondary');
         uploadButton.disabled = true;
     }
 }

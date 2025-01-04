@@ -10,10 +10,10 @@
 {# tray action buttons #}
 <div class="d-flex gap-2 w-100 mb-3">
     <a href="{{ url_for('list_batches', id=tray.batch.id) }}" type="button"
-        class="btn btn-dark flex-fill bi bi-card-list"><i class="bi bi-arrow-left"></i></a>
+        class="btn btn-secondary border-dark flex-fill bi bi-card-list"><i class="bi bi-arrow-left"></i></a>
     <a href="{{ url_for('view_batch', id=tray.batch.id, next=request.path) }}"
-        class="btn btn-dark flex-fill"><span><i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i><i class="bi bi-arrow-left" style="margin-left: -15px;"></i></span></a>
-    <a href="{{ url_for('view_batch', id=tray.batch.id) }}" type="button" class="btn btn-dark flex-fill bi bi-eye"><i
+        class="btn btn-secondary border-dark flex-fill"><span><i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i><i class="bi bi-arrow-left" style="margin-left: -15px;"></i></span></a>
+    <a href="{{ url_for('view_batch', id=tray.batch.id) }}" type="button" class="btn btn-secondary border-dark flex-fill bi bi-eye"><i
             class="bi bi-arrow-left"></i></a>
 </div>
 
@@ -42,7 +42,7 @@
                 <label for="notes" class="form-label">Notes</label>
                 <textarea class="form-control" id="notes" name="notes" rows="3">{{ tray.notes }}</textarea>
             </div>
-            <button type="submit" class="btn btn-dark">Save Changes</button>
+            <button type="submit" class="btn btn-secondary border-dark">Save Changes</button>
             <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
         </form>
     </div>

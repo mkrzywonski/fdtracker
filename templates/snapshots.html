@@ -17,7 +17,7 @@
         <form method="post">
             <label for="comment" class="form-label">Snapshot Comment</label>
             <textarea class="form-control mb-3" id="comment" name="comment" rows="1"></textarea>
-            <button type="submit" name="create_snapshot" class="btn btn-primary bg-dark text-white w-25">
+            <button type="submit" name="create_snapshot" class="btn btn-secondary border-dark text-white w-25">
                 Add
             </button>
         </form>
@@ -44,13 +44,13 @@
                     {# Snapshot action buttons #}
                     <div class="d-flex gap-2 w-100">
                         <button type="submit" name="restore_snapshot"
-                            class="btn btn-dark btn-sm bi-file-earmark me-2 my-2 flex-nowrap flex-fill" style="width: 125px;"
+                            class="btn btn-secondary border-dark btn-sm bi-file-earmark me-2 my-2 flex-nowrap flex-fill" style="width: 125px;"
                             onclick="return confirm('Are you sure you want to restore this snapshot? This will overwrite current data.')">
                             <span><i class="bi bi-arrow-right" style="margin-left: -15px;"></i><i class="bi bi-database"
                                     style="margin-left: -5px;"></i></span>
                         </button>
                         <button type="submit" name="delete_snapshot"
-                            class="btn btn-dark btn-sm bi-trash my-2 flex-nowrap flex-fill" style="width: 125px;"
+                            class="btn btn-secondary border-dark btn-sm bi-trash my-2 flex-nowrap flex-fill" style="width: 125px;"
                             onclick="return confirm('Are you sure you want to delete this snapshot?')">
                         </button>
                     </div>

@@ -9,9 +9,9 @@
 
 {# batch action buttons #}
 <div class="d-flex gap-2 w-100 mb-3">
-    <a href="{{ url_for('list_batches', id=batch.id) }}" type="button" class="btn btn-dark flex-fill bi bi-card-list"><i
+    <a href="{{ url_for('list_batches', id=batch.id) }}" type="button" class="btn btn-secondary border-primary flex-fill bi bi-card-list"><i
             class="bi bi-arrow-left"></i></a>
-    <a href="{{ url_for('view_batch', id=batch.id) }}" type="button" class="btn btn-dark flex-fill bi bi-eye"><i
+    <a href="{{ url_for('view_batch', id=batch.id) }}" type="button" class="btn btn-secondary border-primary flex-fill bi bi-eye"><i
             class="bi bi-arrow-left"></i></a>
 </div>
 
@@ -112,7 +112,7 @@
             {% endfor %}
         </ul>
     </div>
-</div><button type="submit" class="btn btn-dark">Save Changes</button>
+</div><button type="submit" class="btn btn-secondary border-primary">Save Changes</button>
 <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
 </form>
 

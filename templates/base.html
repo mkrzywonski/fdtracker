@@ -48,21 +48,21 @@
             <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                 <ul class="navbar-nav flex-column align-items-end">
                     <!-- New Batch -->
-                    <li class="nav-item">
+                    <li class="nav-item mb-4">
                         <a href="{{ url_for('add_batch') }}" type="button"
                         class="btn btn-dark flex-fill"><span>
                         <i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i>
                         <span class="mb-3">New Batch</span></span></a>
                     </li>
-                    <li>
+                    <li class="nav-item mb-4">
                         <a class="btn btn-dark" href="{{ url_for('list_batches') }}">
                             <i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i>
-                            Batch List
+                            View Batches
                         </a>
                     </li>
-                    <li>
+                    <li class="nav-item mb-4">
                         <a class="btn btn-dark" href="{{ url_for('list_bags') }}">
-                            <i class="bi bi-bag me-3"></i>Bag List</a>
+                            <i class="bi bi-bag me-3"></i>View Bags</a>
                     </li>
                     <!-- Tools menu -->
                     <li class="nav-item dropdown">

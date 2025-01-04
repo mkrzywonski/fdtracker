@@ -77,8 +77,18 @@ body {
 
 .btn {
     font-size: 2.4rem;
+    border-radius: 20px;
+    border-width: 3px;
 }
 
+.btn-mjk {
+/*    border-color: #6f74ff; */
+    background-color: #5d5d5d;
+    color: #ffffff !important;
+}
+
+
+  
 .error_message {
     font-size: 2.4rem;
 }
