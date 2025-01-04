@@ -79,7 +79,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="batch-name text-white">Batch #{{ '%08d' % batch.id }}</span>
                         {% if batch.end_date %}
-                        <span class="badge bg-dark text-white">
+                        <span class="text-white">
                             Completed: {{ batch.end_date.strftime('%Y-%m-%d') }}
                         </span>
                         {% else %}
