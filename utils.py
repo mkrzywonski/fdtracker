@@ -104,3 +104,10 @@ def format_bytes_size(bytes):
             return f"{bytes:.1f} {unit}"
         bytes /= 1024
     return f"{bytes:.1f} TB"
+
+def weight_imperial(grams):
+    ounces = grams / 28.3495  # 1 oz = 28.3495g
+    if ounces < 16:
+        return f"{ounces:.1f}oz"
+    pounds = ounces / 16  # 16 oz = 1 pound
+    return f"{pounds:.1f}lb"

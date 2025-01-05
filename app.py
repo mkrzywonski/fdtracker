@@ -37,6 +37,7 @@ from models import Bag, Batch, Tray, Photo, db
 from utils import (
     water_volume_imperial,
     water_volume_metric,
+    weight_imperial,
     search_batches,
     search_bags,
     format_bytes_size,
@@ -636,9 +637,9 @@ def print_label(id):
 
         # Fixed details
         y = align_text(c, f"Bag ID: {bag.id}", y=y, margin=x)
-        y = align_text(c, f"Freeze Dried Weight: {bag.weight}g", y=y, margin=x)
+        y = align_text(c, f"Freeze Dried Weight: {bag.weight}g ({weight_imperial(bag.weight)})", y=y, margin=x)
         original_weight = round(bag.weight + bag.water_needed, 1)
-        y = align_text(c, f"Original Weight: ~{original_weight}g", y=y, margin=x)
+        y = align_text(c, f"Original Weight: ~{original_weight}g ({weight_imperial(original_weight)})", y=y, margin=x)
         w = bag.water_needed
         water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
         y = align_text(c, f"Water Needed: ~{water_needed}", y=y, margin=x)
@@ -1198,14 +1199,14 @@ def create_batch_pdf(batch=None, batches=[]):
             align_text(doc, "Contents:", y=y, margin=margin + 60)
             y = align_text(doc, f"{tray.contents}", y=y, margin=margin + 160)
             align_text(doc, "Starting Weight:", y=y, margin=margin + 60)
-            y = align_text(doc, f"{tray.starting_weight}g",
+            y = align_text(doc, f"{tray.starting_weight}g ({weight_imperial(tray.starting_weight)})",
                            y=y, margin=margin + 160)
             align_text(doc, "Ending Weight:", y=y, margin=margin + 60)
-            y = align_text(doc, f"{tray.ending_weight}g",
+            y = align_text(doc, f"{tray.ending_weight}g ({weight_imperial(tray.ending_weight)})",
                            y=y, margin=margin + 160)
             if tray.ending_weight is not None:
                 w = tray.starting_weight - tray.ending_weight
-                water_removed = f"{water_volume_metric(w)}({water_volume_imperial(w)})"
+                water_removed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
                 align_text(doc, "Water Removed:", y=y, margin=margin + 60)
                 y = align_text(doc, f"{water_removed}",
                                y=y, margin=margin + 160)
@@ -1252,6 +1253,16 @@ def create_batch_pdf(batch=None, batches=[]):
                     font_name="Helvetica-Bold",
                     font_size=12,
                 )
+                align_text(doc, "Created:", y=y, margin=margin + 60)
+                y = align_text(doc, f"{bag.created_date.strftime('%Y-%m-%d')}",
+                               y=y, margin=margin + 150)
+                align_text(doc, "Consumed:", y=y, margin=margin + 60)
+                if bag.consumed_date is not None:
+                    y = align_text(doc, f"{bag.consumed_date.strftime('%Y-%m-%d')}",
+                                   y=y, margin=margin + 150)
+                else:
+                    y = align_text(doc, "Not yet consumed",
+                                   y=y, margin=margin + 150)
                 align_text(doc, "Contents:", y=y, margin=margin + 60)
                 y = align_text(doc, f"{bag.contents}",
                                y=y, margin=margin + 150)
@@ -1259,10 +1270,10 @@ def create_batch_pdf(batch=None, batches=[]):
                 y = align_text(doc, f"{bag.location}",
                                y=y, margin=margin + 150)
                 align_text(doc, "Weight:", y=y, margin=margin + 60)
-                y = align_text(doc, f"{bag.weight}g", y=y, margin=margin + 150)
+                y = align_text(doc, f"{bag.weight}g ({weight_imperial(bag.weight)})", y=y, margin=margin + 150)
                 align_text(doc, "Water Needed:", y=y, margin=margin + 60)
                 w = bag.water_needed
-                water_needed = f"{water_volume_metric(w)}({water_volume_imperial(w)})"
+                water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
                 y = align_text(
                     doc, f"about {water_needed}", y=y, margin=margin + 150)
                 if bag.notes:
@@ -1405,7 +1416,7 @@ def create_bag_location_inventory_pdf(bags):
                 y=y,
                 margin=margin + 200,
             )
-            y = align_text(doc, f"Weight: {bag.weight}g", y=y, margin=margin + 350)
+            y = align_text(doc, f"Weight: {bag.weight}g ({weight_imperial(bag.weight)})", y=y, margin=margin + 350)
             y = draw_wrapped_text(
                 doc, f"Contents: {bag.contents}", margin + 40, y)
             if bag.notes:
@@ -1480,7 +1491,7 @@ def create_bag_inventory_pdf(bags):
         y = draw_wrapped_text(
             doc, f"Location: {bag.location or 'Unspecified'}", margin + 40, y
         )
-        y = draw_wrapped_text(doc, f"Weight: {bag.weight}g", margin + 40, y)
+        y = draw_wrapped_text(doc, f"Weight: {bag.weight}g ({weight_imperial(bag.weight)})", margin + 40, y)
 
         if bag.water_needed:
             w = bag.water_needed
