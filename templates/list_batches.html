@@ -61,12 +61,12 @@
         {# End of Search Card #}
 
         {# Batch list action buttons #}
-        <div class="d-flex gap-2 w-100">
-            <a href="{{ url_for('add_batch') }}" type="button" class="btn btn-secondary border-primary flex-fill">
+        <div class="d-flex gap-2 w-100 my-4">
+            <a href="{{ url_for('add_batch') }}" type="button" class="btn btn-lg btn-secondary border-primary flex-fill" style="line-height: 80px;">
                 <span><span style="margin-right: -8px;">+</span>
                 <i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i>
                 <span class="mb-3">New Batch</span></span></a>
-                <a href="{{ url_for('batch_report') }}" target="_blank" class="btn btn-secondary border-primary flex-fill bi bi-printer"></a>
+                <a href="{{ url_for('batch_report') }}" target="_blank" class="btn btn-secondary border-primary flex-fill bi bi-printer" style="line-height: 80px;"></a>
         </div>
 
         {# Display batch list #}
