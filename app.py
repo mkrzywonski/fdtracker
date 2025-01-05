@@ -1201,10 +1201,10 @@ def create_batch_pdf(batch=None, batches=[]):
             align_text(doc, "Starting Weight:", y=y, margin=margin + 60)
             y = align_text(doc, f"{tray.starting_weight}g ({weight_imperial(tray.starting_weight)})",
                            y=y, margin=margin + 160)
-            align_text(doc, "Ending Weight:", y=y, margin=margin + 60)
-            y = align_text(doc, f"{tray.ending_weight}g ({weight_imperial(tray.ending_weight)})",
-                           y=y, margin=margin + 160)
             if tray.ending_weight is not None:
+                align_text(doc, "Ending Weight:", y=y, margin=margin + 60)
+                y = align_text(doc, f"{tray.ending_weight}g ({weight_imperial(tray.ending_weight)})",
+                            y=y, margin=margin + 160)
                 w = tray.starting_weight - tray.ending_weight
                 water_removed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
                 align_text(doc, "Water Removed:", y=y, margin=margin + 60)
@@ -1495,7 +1495,7 @@ def create_bag_inventory_pdf(bags):
 
         if bag.water_needed:
             w = bag.water_needed
-            water_needed = f"{water_volume_metric(w)}({water_volume_imperial(w)})"
+            water_needed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
             y = draw_wrapped_text(
                 doc, f"Water Needed: about {water_needed}", margin + 40, y
             )
