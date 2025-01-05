@@ -1,62 +1,58 @@
 # Standard library imports
+import configparser
+import hashlib
+import json
 import os
 import re
+import shutil
 from datetime import datetime, UTC
 from io import BytesIO
 from urllib.parse import urlparse
-import configparser
-from zipfile import ZipFile, BadZipFile
-import shutil
-import hashlib
-import json
+from zipfile import ZipFile
 
 # Third-party imports
+import magic
+import qrcode
 from flask import (
     Flask,
+    current_app,
+    flash,
+    redirect,
     render_template,
     request,
-    redirect,
-    url_for,
     send_file,
     send_from_directory,
-    flash
+    url_for
 )
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug.utils import secure_filename
-import qrcode
+from markupsafe import Markup
 from PIL import Image
-from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import inch, letter
 from reportlab.lib.utils import ImageReader, simpleSplit
-from markupsafe import Markup
+from reportlab.pdfgen import canvas
+from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.utils import secure_filename
 
 # Local imports
-from models import Bag, Batch, Tray, Photo, db
-from utils import (
-    water_volume_imperial,
-    water_volume_metric,
-    weight_imperial,
-    search_batches,
-    search_bags,
-    format_bytes_size,
-)
+from models import Bag, Batch, Photo, Tray, db
 from pdf_helpers import (
     align_text,
-    draw_page_border,
-    start_new_page,
-    draw_wrapped_text,
     draw_image,
+    draw_page_border,
+    draw_wrapped_text,
+    start_new_page
+)
+from utils import (
+    format_bytes_size,
+    search_bags,
+    search_batches,
+    water_volume_imperial,
+    water_volume_metric,
+    weight_imperial
 )
 
-import os
-from werkzeug.utils import secure_filename
-from werkzeug.exceptions import RequestEntityTooLarge
-from flask import request, render_template, redirect, url_for, current_app
-from PIL import Image
-import magic
-import shutil
 
 # Constants
 PER_PAGE = 25
