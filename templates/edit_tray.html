@@ -29,6 +29,11 @@
                     required>
             </div>
             <div class="mb-3">
+                <label for="tare_weight" class="form-label">Empty Tray Weight (g)</label>
+                <input type="number" step="0.01" class="form-control" id="tare_weight" name="tare_weight"
+                    value="{{ tray.tare_weight }}">
+            </div>
+            <div class="mb-3">
                 <label for="starting_weight" class="form-label">Initial Weight (g)</label>
                 <input type="number" step="0.01" class="form-control" id="starting_weight" name="starting_weight"
                     value="{{ tray.starting_weight }}">

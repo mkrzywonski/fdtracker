@@ -19,12 +19,11 @@
             {% endfor %}
         </select>
     </div>
-    
 
     <div id="trayContainer" data-trays="{{ trays | tojson | safe }}">
         {% for i in range(tray_count) %}
         <div class="card border border-dark mb-3">
-            <div class="card-header mb-2 bg-dark text-white">Tray {{ i + 1 }}</div>
+            <div class="card-header mb-2 bg-dark text-white">X Tray {{ i + 1 }} X</div>
             <div class="card-body">
                 <div class="mb-3">
                     <label class="form-label">Contents</label>
@@ -35,6 +34,11 @@
                     <label class="form-label">Initial Weight (g)</label>
                     <input type="number" step="0.01" name="starting_weight_{{ i }}" class="form-control"
                         value="{{ trays[i]['starting_weight'] if trays|length > i else '' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Empty Tray Weight (g)</label>
+                    <input type="number" step="0.01" name="tare_weight_{{ i }}" class="form-control"
+                        value="{{ trays[i]['tare_weight'] if trays|length > i else '0' }}" required>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Tray Notes</label>
@@ -71,6 +75,7 @@
             savedTrays[index] = {
                 contents: tray.querySelector('[name^="contents_"]').value,
                 starting_weight: tray.querySelector('[name^="starting_weight_"]').value,
+                tare_weight: tray.querySelector('[name^="tare_weight_"]').value,
                 notes: tray.querySelector('[name^="notes_"]').value
             };
         });
@@ -79,7 +84,7 @@
 
         for (let i = 0; i < count; i++) {
             // Use saved data if available, otherwise empty strings
-            const tray = savedTrays[i] || { contents: '', starting_weight: '', notes: '' };
+            const tray = savedTrays[i] || { contents: '', starting_weight: '', tare_weight: '0', notes: '' };
 
             container.innerHTML += `
             <div class="card border border-dark mb-3">
@@ -92,6 +97,10 @@
                     <div class="mb-3">
                         <label class="form-label">Initial Weight (g)</label>
                         <input type="number" step="0.01" name="starting_weight_${i}" class="form-control" value="${tray.starting_weight}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Empty Tray Weight (g)</label>
+                        <input type="number" step="0.01" name="tare_weight_${i}" class="form-control" value="${tray.tare_weight}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Tray Notes</label>

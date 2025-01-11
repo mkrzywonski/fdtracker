@@ -113,21 +113,32 @@ def add_batch():
         tray_count = int(request.form["tray_count"])
         batch_notes = request.form.get("batch_notes", "")
         trays = []
+        error = False
 
         # Validate tray weights and gather data
         for i in range(tray_count):
             contents = request.form.get(f"contents_{i}", "")
             starting_weight = request.form.get(f"starting_weight_{i}", "")
+            tare_weight = request.form.get(f"tare_weight_{i}", 0)
             notes = request.form.get(f"notes_{i}", "")
 
             try:
                 starting_weight = float(starting_weight)
                 if starting_weight <= 0:
                     flash(f"Tray {i + 1}: Initial weight must be greater than 0.", "danger")
-                    return render_template("add_batch.html", tray_count=1, trays=[], batch_notes=batch_notes)
+                    error = True
             except (ValueError, TypeError):
                 flash(f"Tray {i + 1}: Initial weight must be a valid number.", "danger")
-                return render_template("add_batch.html", tray_count=1, trays=[], batch_notes=batch_notes)
+                error = True
+
+            try:
+                tare_weight = float(tare_weight)
+                if starting_weight < tare_weight:
+                    flash(f"Tray {i + 1}: Initial weight must be greater than empty tray weight.", "danger")
+                    error = True
+            except (ValueError, TypeError):
+                flash(f"Tray {i + 1}: Empty tray weight must be a valid number.", "danger")
+                error = True
 
             # Append the entered data for each tray (preserving input even if invalid)
             trays.append(
@@ -137,9 +148,16 @@ def add_batch():
                         starting_weight if isinstance(
                             starting_weight, float) else ""
                     ),
+                    "tare_weight": (
+                        tare_weight if isinstance(
+                            tare_weight, float) else "0"
+                    ),
                     "notes": notes,
                 }
             )
+
+        if error:
+            return render_template("add_batch.html", tray_count=tray_count, trays=trays, batch_notes=batch_notes)
 
         # Create a new batch
         batch = Batch(notes=request.form["batch_notes"])
@@ -150,6 +168,7 @@ def add_batch():
             tray = Tray(
                 contents=tray_data["contents"],
                 starting_weight=tray_data["starting_weight"],
+                tare_weight=tray_data["tare_weight"],
                 notes=tray_data["notes"],
                 position=i + 1,
             )
@@ -224,7 +243,7 @@ def add_bag(id):
     if request.method == "POST":
         another = request.form.get("another")
         contents = request.form.get("contents", tray.contents)
-        weight = request.form.get("weight", tray.ending_weight)
+        weight = request.form.get("weight", "")
         location = request.form.get("location")
         notes = request.form.get("notes")
 
@@ -232,7 +251,7 @@ def add_bag(id):
             tray.ending_weight = tray.starting_weight
         weight_loss_ratio = (
             tray.starting_weight - tray.ending_weight
-        ) / tray.ending_weight
+        ) / (tray.ending_weight - tray.tare_weight)
         bag_weight = float(request.form["weight"])
         water_needed = weight_loss_ratio * bag_weight
         water_needed = round(water_needed, 1)
@@ -268,7 +287,7 @@ def add_bag(id):
 
     else:
         contents = tray.contents
-        weight = round(tray.starting_weight - tray.ending_weight, 1)
+        weight = None
         location = None
         notes = None
 
@@ -387,6 +406,11 @@ def edit_tray(id):
             tray.ending_weight = (
                 float(request.form["ending_weight"])
                 if request.form["ending_weight"]
+                else None
+            )
+            tray.tare_weight = (
+                float(request.form["tare_weight"])
+                if request.form["tare_weight"]
                 else None
             )
             tray.notes = request.form["notes"]
@@ -1194,12 +1218,14 @@ def create_batch_pdf(batch=None, batches=[]):
             )
             align_text(doc, "Contents:", y=y, margin=margin + 60)
             y = align_text(doc, f"{tray.contents}", y=y, margin=margin + 160)
+            starting_weight = tray.starting_weight - tray.tare_weight
             align_text(doc, "Starting Weight:", y=y, margin=margin + 60)
-            y = align_text(doc, f"{tray.starting_weight}g ({weight_imperial(tray.starting_weight)})",
+            y = align_text(doc, f"{starting_weight}g ({weight_imperial(starting_weight)})",
                            y=y, margin=margin + 160)
             if tray.ending_weight is not None:
+                ending_weight = tray.ending_weight - tray.tare_weight
                 align_text(doc, "Ending Weight:", y=y, margin=margin + 60)
-                y = align_text(doc, f"{tray.ending_weight}g ({weight_imperial(tray.ending_weight)})",
+                y = align_text(doc, f"{ending_weight}g ({weight_imperial(ending_weight)})",
                             y=y, margin=margin + 160)
                 w = tray.starting_weight - tray.ending_weight
                 water_removed = f"{water_volume_metric(w)} ({water_volume_imperial(w)})"
@@ -1509,9 +1535,23 @@ def create_bag_inventory_pdf(bags):
     doc.save()
     return buffer
 
+def add_tare_weight_if_missing():
+    with app.app_context():
+        # Check if tare_weight column exists
+        inspector = db.inspect(db.engine)
+        has_tare_weight = 'tare_weight' in [col['name'] for col in inspector.get_columns('tray')]
+        
+        if not has_tare_weight:
+            # Add the column
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE tray ADD COLUMN tare_weight FLOAT'))
+                # Set default value of 0 for all existing trays
+                conn.execute(db.text('UPDATE tray SET tare_weight = 0'))
+                conn.commit()
 
 
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        add_tare_weight_if_missing()
     app.run(debug=True, host=flask_host, port=flask_port)

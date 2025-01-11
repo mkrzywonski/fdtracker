@@ -38,6 +38,7 @@ class Tray(db.Model):
     starting_weight = db.Column(db.Float)
     ending_weight = db.Column(db.Float)
     previous_weight = db.Column(db.Float)
+    tare_weight = db.Column(db.Float)
     notes = db.Column(db.Text, index=True)
     position = db.Column(db.Integer, nullable=False)  # Tray position in the machine
 

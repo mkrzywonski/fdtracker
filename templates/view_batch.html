@@ -55,6 +55,7 @@
                     <div class="card-body">
                         <p class="card-text">
                             Contents: {{ tray.contents|highlight(search_query) }}<br>
+                            Empty Tray Weight: {{ tray.tare_weight }}g<br>
                             Initial Weight: {{ tray.starting_weight }}g<br>
                             {% if tray.previous_weight %}
                             Previous Weight Check: {{ tray.previous_weight }}g<br>
@@ -72,6 +73,7 @@
                                         class="form-control border-danger text-danger ending-weight"
                                         data-tray-id="{{ tray.id }}" data-starting-weight="{{ tray.starting_weight }}"
                                         data-previous-weight="{{ tray.previous_weight or tray.starting_weight }}"
+                                        data-tare-weight="{{ tray.tare_weight }}"
                                         value="{{ tray.previous_weight or '' }}" required>
                                     <div class="mt-2 text-danger">
                                         <strong>Percent Change:</strong>
@@ -122,11 +124,12 @@
                 <div class="card-body">
                     <p class="card-text">
                         Contents: {{ tray.contents|highlight(search_query) }}<br>
+                        Empty Tray Weight: {{ tray.tare_weight }}g<br>
                         Initial Weight: {{ tray.starting_weight }}g<br>
                         {% if tray.ending_weight %}
                         Final Weight: {{ tray.ending_weight }}g<br>
                         Weight Loss: {{ ((tray.starting_weight - tray.ending_weight) /
-                        tray.starting_weight * 100)|round(1) }}%
+                        (tray.starting_weight - tray.tare_weight) * 100)|round(1) }}%
                         {% endif %}
                         {% if tray.notes %}
                         <br>Notes: {{ tray.notes|highlight(search_query) }}
@@ -233,12 +236,13 @@
             document.querySelectorAll('.ending-weight').forEach(function (input) {
                 input.addEventListener('input', function () {
                     const trayId = this.getAttribute('data-tray-id');
+                    const tareWeight = parseFloat(this.getAttribute('data-tare-weight'));
                     const startingWeight = parseFloat(this.getAttribute('data-starting-weight'));
                     const previousWeight = parseFloat(this.getAttribute('data-previous-weight'));
                     const endingWeight = parseFloat(this.value);
 
-                    if (!isNaN(startingWeight) && !isNaN(previousWeight) && !isNaN(endingWeight) && startingWeight > 0) {
-                        const percentChange = (((previousWeight - endingWeight) / startingWeight) * 100).toFixed(2);
+                    if (!isNaN(startingWeight) && !isNaN(previousWeight) && !isNaN(endingWeight) && !isNaN(tareWeight) && startingWeight > 0) {
+                        const percentChange = (((previousWeight - endingWeight) / (startingWeight - tareWeight)) * 100).toFixed(2);
                         document.getElementById(`percent-change-${trayId}`).textContent = `${percentChange}%`;
                     } else {
                         document.getElementById(`percent-change-${trayId}`).textContent = '0%';
