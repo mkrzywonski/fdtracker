@@ -33,7 +33,7 @@ This guide will walk you through setting up the Freeze Dry Tracker application o
 
 ---
 
-## 3. Clone the Repository
+## 3. Clone the FDTracker Repository
 
 1. Install Updates:
    ```bash
