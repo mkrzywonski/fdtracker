@@ -50,7 +50,8 @@ from utils import (
     search_batches,
     water_volume_imperial,
     water_volume_metric,
-    weight_imperial
+    weight_imperial,
+    test_db_connection
 )
 
 
@@ -71,16 +72,26 @@ SUPPORTED_MIME_TYPES = {
 # Flask app configuration
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-app.config.update(
-    {
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///freezedry.db",
-        "UPLOAD_FOLDER": UPLOAD_FOLDER,
-    }
-)
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # Load configuration file
 config = configparser.ConfigParser()
 config.read("config.ini")
+
+# Database configuration
+db_type = config.get("database", "type", fallback="sqlite")
+if db_type == "mysql":
+    db_config = {
+        "type": config.get("database", "type", fallback="sqlite"),
+        "host": config.get("database", "host", fallback="localhost"),
+        "port": config.getint("database", "port", fallback=3306),
+        "name": config.get("database", "name", fallback="freezedry"),
+        "user": config.get("database", "user", fallback="fdtracker"),
+        "password": config.get("database", "password", fallback="")
+    }
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['name']}"
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///freezedry.db"
 
 # Server settings
 flask_host = config.get("server", "flask_host", fallback="127.0.0.1")
@@ -104,8 +115,64 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 @app.route("/")
 def root():
+    if db_type == 'mysql':
+        success, error = test_db_connection()
+        if not success:
+            return mysql_setup(error)
+        try:
+            return list_batches()
+        except Exception as e:
+            return mysql_setup(error)
     return list_batches()
 
+
+
+@app.route("/mysql")
+def mysql_setup(error=None):
+    if db_type != 'mysql':
+        return redirect(url_for('root'))
+        
+    if not error:
+        success, error = test_db_connection()
+        if success:
+            return redirect(url_for('root'))
+
+    setup_steps = []
+
+    if "MySQL server not running" in str(error):
+        setup_steps = [
+            ("Install MySQL server:", "sudo apt install mysql-server"),
+            ("Enable MySQL service:", "sudo systemctl enable mysql"),
+            ("Start MySQL service:", "sudo systemctl start mysql"),
+            ("Verify MySQL is running:", "sudo systemctl status mysql")
+        ]
+    elif "Access denied" in str(error) or "Database does not exist" in str(error):
+        setup_steps = [
+            ("Log into MySQL as root:", "sudo mysql"),
+            ("Create the database:", f"CREATE DATABASE {db_config['name']};"),
+            ("Create the user:", f"CREATE USER '{db_config['user']}'@'localhost' IDENTIFIED BY '{db_config['password']}';"),
+            ("Grant privileges:", f"GRANT ALL PRIVILEGES ON {db_config['name']}.* TO '{db_config['user']}'@'localhost';"),
+            ("Apply privileges:", "FLUSH PRIVILEGES;"),
+            ("Exit mysql:", "exit"),
+            (f"Make sure the database password for user '{db_config['user']}' matches the password in config.ini", f"ALTER USER '{db_config['user']}'@'localhost' IDENTIFIED BY '{db_config['password']}';"),
+            ("Check the databse configuration in config.ini", f"[database]\ntype = mysql\nhost = {db_config['host']}\nport = {db_config['port']}\nname = {db_config['name']}\nuser = {db_config['user']}\npassword = {db_config['password']}")
+        ]
+    elif "Unknown database" in str(error):
+        setup_steps = [
+            ("Log into MySQL as root:", "sudo mysql"),
+            ("Create the database:", f"CREATE DATABASE {db_config['name']};"),
+            ("Grant privileges:", f"GRANT ALL PRIVILEGES ON {db_config['name']}.* TO '{db_config['user']}'@'localhost';"),
+            ("Exit mysql:", "exit")
+        ]
+    else:
+        setup_steps = [("Unknown error occurred. Please check your MySQL installation and configuration.", None)]
+        
+    return render_template(
+        "mysql_setup.html",
+        error=str(error),
+        config=db_config,
+        setup_steps=setup_steps
+    )
 
 @app.route("/add", methods=["GET", "POST"])
 def add_batch():
@@ -1171,7 +1238,6 @@ def highlight_search(text, search):
 @app.route("/batch_report/")
 @app.route("/batch_report/<int:id>")
 def batch_report(id=None):
-    print(f"id: {id}")
     if id:
         # Single batch report
         batch = db.session.get(Batch, id)
@@ -1642,6 +1708,11 @@ def update_schema():
 
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()
-        update_schema()
-    app.run(debug=True, host=flask_host, port=flask_port)
+        try:
+            if test_db_connection():
+                db.create_all()
+                update_schema()
+            app.run(debug=True, host=flask_host, port=flask_port)
+        except Exception as e:
+            print(f"Error: {e}")
+            app.run(debug=True, host=flask_host, port=flask_port)

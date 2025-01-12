@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+{# Set the page title #}
+<script>
+    document.getElementById('page_title').textContent = 'MySQL Database Setup';
+</script>
+
+<div class="container-fluid mt-4">
+    <div class="alert alert-danger">
+        <strong>Connection Error:</strong> {{ error }}
+    </div>
+
+    <div class="card border border-dark mb-4">
+        <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
+            Current Configuration (config.ini)
+        </div>
+        <div class="card-body">
+            <p><strong>Type:</strong> {{ config.type }}</p>
+            <p><strong>Host:</strong> {{ config.host }}</p>
+            <p><strong>Port:</strong> {{ config.port }}</p>
+            <p><strong>Database:</strong> {{ config.name }}</p>
+            <p><strong>User:</strong> {{ config.user }}</p>
+        </div>
+    </div>
+
+    <div class="card border border-dark mb-4">
+        <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
+            Setup Instructions
+        </div>
+        <div class="card-body">
+            <ol>
+                {% for text, code in setup_steps %}
+                    <li>
+                        {{ text }}
+                        {% if code %}
+                        <div class="position-relative">
+                            <div class="bd-clipboard">
+                                <button type="button" class="btn-clipboard" data-clipboard-text="{{ code.strip() }}">
+                                    <img src="{{ url_for('static', filename='clipboard.svg') }}" alt="Copy" class="bi">
+                                </button>
+                            </div>
+                            <div class="highlight">
+                                <pre class="chroma"><code class="language-text" data-lang="text">{{ code }}</code></pre>
+                            </div>
+                        </div>
+                    {% endif %}
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <a href="{{ url_for('root') }}" class="btn btn-secondary border-dark text-white">Test Database Connection</a>
+    </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var clipboard = new ClipboardJS('.btn-clipboard');
+        
+        clipboard.on('success', function(e) {
+            var button = e.trigger;
+            button.classList.add('copied');
+            setTimeout(function() {
+                button.classList.remove('copied');
+            }, 2000);
+        });
+    });
+</script>
+{% endblock %}
