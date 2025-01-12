@@ -85,9 +85,35 @@ This guide will walk you through setting up the Freeze Dry Tracker application o
 
 ## 7. Set Up the Systemd Service
 
-1. Copy the `fdtracker.service` file to the systemd directory:
+1. Create a Systemd unit file for the application:
    ```bash
-   sudo cp fdtracker.service /etc/systemd/system/
+   sudo nano /etc/systemd/system/fdtracker.service
+   ```
+   Add the following content:
+   ```bash
+    [Unit]
+    Description=Flask FDTracker Service
+    After=network.target
+
+    [Service]
+    # Update these to the correct user/group on your system.
+    User=fd
+    Group=fd
+
+    # The working directory for the service
+    WorkingDirectory=/home/fd/fdtracker
+
+    # Make sure the PATH points to your virtual environment’s bin folder
+    Environment="PATH=/home/fd/fdtracker/.venv/bin"
+
+    # The command to start your Flask app via Gunicorn
+    ExecStart=/home/fd/fdtracker/.venv/bin/gunicorn --bind 127.0.0.1:5000 app:app
+
+    # Automatically restart if the service crashes
+    Restart=always
+
+    [Install]
+    WantedBy=multi-user.target
    ```
 2. Reload systemd to recognize the new service:
    ```bash

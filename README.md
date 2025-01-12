@@ -53,6 +53,7 @@ A web application for tracking freeze-dried food batches. This tool allows you t
   - ReportLab for PDF label creation
 
 ## Installation
+To quickly install and try out the app, follow the instructions below. For a more comprehensive guide to setting up the app on a Raspberry Pi, see [Raspberry Pi Setup Guide](raspberry-pi-setup.md).
 
 1. Clone the repository:
    ```bash
