@@ -72,4 +72,3 @@ class Photo(db.Model):
     )
     filename = db.Column(db.String(255), nullable=False)
     caption = db.Column(db.Text)
-    uploaded_at = db.Column(db.DateTime, default=datetime.now(UTC))

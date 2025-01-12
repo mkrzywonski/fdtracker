@@ -778,8 +778,7 @@ def create_backup_file(comment=""):
             "id": photo.id,
             "batch_id": photo.batch_id,
             "filename": photo.filename,
-            "caption": photo.caption,
-            "uploaded_at": photo.uploaded_at.isoformat()
+            "caption": photo.caption
         }
         db_data["photos"].append(photo_data)
 
@@ -953,8 +952,7 @@ def restore_backup(snapshot=None):
                     id=photo_data["id"],
                     batch_id=photo_data["batch_id"],
                     filename=photo_data["filename"],
-                    caption=photo_data["caption"],
-                    uploaded_at=datetime.fromisoformat(photo_data["uploaded_at"])
+                    caption=photo_data["caption"]
                 )
                 db.session.add(photo)
 
@@ -974,7 +972,7 @@ def restore_backup(snapshot=None):
 
     return redirect(url_for("list_batches"))
 
-    
+
 @app.route("/snapshots", methods=["GET", "POST"])
 def manage_snapshots():
     snapshot_dir = os.path.join("static", "snapshots")
@@ -1618,9 +1616,9 @@ def create_bag_inventory_pdf(bags):
     doc.save()
     return buffer
 
-def add_tare_weight_if_missing():
+def update_schema():
     with app.app_context():
-        # Check if tare_weight column exists
+        # Check if tare_weight column exists in tray table
         inspector = db.inspect(db.engine)
         has_tare_weight = 'tare_weight' in [col['name'] for col in inspector.get_columns('tray')]
         
@@ -1632,9 +1630,18 @@ def add_tare_weight_if_missing():
                 conn.execute(db.text('UPDATE tray SET tare_weight = 0'))
                 conn.commit()
 
+        # Check if uploaded_at column exists in photo table
+        has_uploaded_at = 'uploaded_at' in [col['name'] for col in inspector.get_columns('photo')]
+        
+        if has_uploaded_at:
+            # Remove the column
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE photo DROP COLUMN uploaded_at'))
+                conn.commit()
+
 
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-        add_tare_weight_if_missing()
+        update_schema()
     app.run(debug=True, host=flask_host, port=flask_port)
