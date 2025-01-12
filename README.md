@@ -4,6 +4,10 @@ A web application for tracking freeze-dried food batches. This tool allows you t
 
 ## Features
 
+- **User Interface**
+  - Thumb-friendly design for use on smartphone
+  - No need for a full desktop setup in your food prep area
+    
 - **Batch Management**:
   - Create, view, edit, and delete batches.
   - Record trays in each batch with contents and weights.
@@ -28,6 +32,7 @@ A web application for tracking freeze-dried food batches. This tool allows you t
 
 - **Lightweight**
   - Can be run on a Raspberry PI or other small computer.
+  - The author runs the app on a Raspberry Pi Zero 2 W
 
 ## Technologies Used
 
