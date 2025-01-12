@@ -150,3 +150,36 @@ img#preview {
 .form-check-input:hover {
     border-color: #000000;
 }
+
+.bd-clipboard {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 10;
+}
+
+.btn-clipboard {
+    background-color: transparent;
+    border: 0;
+    border-radius: 0.25rem;
+    color: #6c757d;
+    padding: 0.25rem;
+    transition: opacity .1s ease-in-out;
+}
+
+.btn-clipboard:hover {
+    color: #212529;
+}
+
+.highlight {
+    position: relative;
+    background-color: #f8f9fa;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.25rem;
+}
+
+.highlight pre {
+    margin-bottom: 0;
+    padding-right: 2rem;
+}

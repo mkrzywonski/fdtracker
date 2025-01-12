@@ -9,7 +9,7 @@ from PIL import Image
 from sqlalchemy import or_
 
 # Local application imports
-from models import Batch, Tray, Bag
+from models import Batch, Tray, Bag, db
 
 
 def water_volume_imperial(grams):
@@ -111,3 +111,43 @@ def weight_imperial(grams):
         return f"{ounces:.1f}oz"
     pounds = ounces / 16  # 16 oz = 1 pound
     return f"{pounds:.1f}lb"
+
+def test_db_connection():
+    try:
+        # Test 1: Basic connection to check if MySQL server is running
+        db.session.execute(db.text('SELECT 1'))
+        
+        # Test 2: Check if database exists by attempting to use it
+        db.session.execute(db.text('SELECT DATABASE()'))
+        
+        # Test 3: Check user permissions with write test
+        if db.session.is_active:
+            db.session.rollback()
+        db.session.begin()
+        db.session.rollback()
+        
+        # Test 4: Verify schema matches by checking all required tables
+        db.create_all()
+        inspector = db.inspect(db.engine)
+        required_tables = {'batch', 'tray', 'bag', 'photo'}
+        existing_tables = set(inspector.get_table_names())
+        missing_tables = required_tables - existing_tables
+        if missing_tables:
+            return False, f"Missing required table(s): {', '.join(missing_tables)}"
+        return True, None
+        
+    except db.exc.OperationalError as e:
+        if "Connection refused" in str(e):
+            return False, f"MySQL server not running at configured host/port"
+        elif "Access denied" in str(e):
+            return False, f"Access denied for configured user"
+        elif "Unknown database" in str(e):
+            return False, f"Database does not exist"
+        return False, str(e)
+        
+    except Exception as e:
+        return False, str(e)
+
+    finally:
+        if db.session.is_active:
+            db.session.rollback()

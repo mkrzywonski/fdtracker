@@ -38,7 +38,7 @@ class Tray(db.Model):
     starting_weight = db.Column(db.Float)
     ending_weight = db.Column(db.Float)
     previous_weight = db.Column(db.Float)
-    tare_weight = db.Column(db.Float)
+    tare_weight = db.Column(db.Float, default=0.0)
     notes = db.Column(db.Text, index=True)
     position = db.Column(db.Integer, nullable=False)  # Tray position in the machine
 
@@ -72,4 +72,3 @@ class Photo(db.Model):
     )
     filename = db.Column(db.String(255), nullable=False)
     caption = db.Column(db.Text)
-    uploaded_at = db.Column(db.DateTime, default=datetime.now(UTC))

@@ -50,7 +50,8 @@ from utils import (
     search_batches,
     water_volume_imperial,
     water_volume_metric,
-    weight_imperial
+    weight_imperial,
+    test_db_connection
 )
 
 
@@ -71,16 +72,26 @@ SUPPORTED_MIME_TYPES = {
 # Flask app configuration
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-app.config.update(
-    {
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///freezedry.db",
-        "UPLOAD_FOLDER": UPLOAD_FOLDER,
-    }
-)
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # Load configuration file
 config = configparser.ConfigParser()
 config.read("config.ini")
+
+# Database configuration
+db_type = config.get("database", "type", fallback="sqlite")
+if db_type == "mysql":
+    db_config = {
+        "type": config.get("database", "type", fallback="sqlite"),
+        "host": config.get("database", "host", fallback="localhost"),
+        "port": config.getint("database", "port", fallback=3306),
+        "name": config.get("database", "name", fallback="freezedry"),
+        "user": config.get("database", "user", fallback="fdtracker"),
+        "password": config.get("database", "password", fallback="")
+    }
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['name']}"
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///freezedry.db"
 
 # Server settings
 flask_host = config.get("server", "flask_host", fallback="127.0.0.1")
@@ -104,8 +115,64 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 @app.route("/")
 def root():
+    if db_type == 'mysql':
+        success, error = test_db_connection()
+        if not success:
+            return mysql_setup(error)
+        try:
+            return list_batches()
+        except Exception as e:
+            return mysql_setup(error)
     return list_batches()
 
+
+
+@app.route("/mysql")
+def mysql_setup(error=None):
+    if db_type != 'mysql':
+        return redirect(url_for('root'))
+        
+    if not error:
+        success, error = test_db_connection()
+        if success:
+            return redirect(url_for('root'))
+
+    setup_steps = []
+
+    if "MySQL server not running" in str(error):
+        setup_steps = [
+            ("Install MySQL server:", "sudo apt install mysql-server"),
+            ("Enable MySQL service:", "sudo systemctl enable mysql"),
+            ("Start MySQL service:", "sudo systemctl start mysql"),
+            ("Verify MySQL is running:", "sudo systemctl status mysql")
+        ]
+    elif "Access denied" in str(error) or "Database does not exist" in str(error):
+        setup_steps = [
+            ("Log into MySQL as root:", "sudo mysql"),
+            ("Create the database:", f"CREATE DATABASE {db_config['name']};"),
+            ("Create the user:", f"CREATE USER '{db_config['user']}'@'localhost' IDENTIFIED BY '{db_config['password']}';"),
+            ("Grant privileges:", f"GRANT ALL PRIVILEGES ON {db_config['name']}.* TO '{db_config['user']}'@'localhost';"),
+            ("Apply privileges:", "FLUSH PRIVILEGES;"),
+            ("Exit mysql:", "exit"),
+            (f"Make sure the database password for user '{db_config['user']}' matches the password in config.ini", f"ALTER USER '{db_config['user']}'@'localhost' IDENTIFIED BY '{db_config['password']}';"),
+            ("Check the databse configuration in config.ini", f"[database]\ntype = mysql\nhost = {db_config['host']}\nport = {db_config['port']}\nname = {db_config['name']}\nuser = {db_config['user']}\npassword = {db_config['password']}")
+        ]
+    elif "Unknown database" in str(error):
+        setup_steps = [
+            ("Log into MySQL as root:", "sudo mysql"),
+            ("Create the database:", f"CREATE DATABASE {db_config['name']};"),
+            ("Grant privileges:", f"GRANT ALL PRIVILEGES ON {db_config['name']}.* TO '{db_config['user']}'@'localhost';"),
+            ("Exit mysql:", "exit")
+        ]
+    else:
+        setup_steps = [("Unknown error occurred. Please check your MySQL installation and configuration.", None)]
+        
+    return render_template(
+        "mysql_setup.html",
+        error=str(error),
+        config=db_config,
+        setup_steps=setup_steps
+    )
 
 @app.route("/add", methods=["GET", "POST"])
 def add_batch():
@@ -712,48 +779,105 @@ def create_backup():
         download_name=f'fdtracker_backup_{datetime.now().strftime("%Y%m%d")}.zip',)
 
 def create_backup_file(comment=""):
-    db_file = os.path.join(
-        app.instance_path, app.config["SQLALCHEMY_DATABASE_URI"].replace("sqlite:///", ""))
     manifest = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "comment": comment,
         "files": [],
     }
-    backup_files = [db_file]
     backup_hasher = hashlib.sha256()
-
-    # Get list of image files from database
-    photos = db.session.query(Photo.filename).all()
-    for photo, in photos:
-        file_path = os.path.join(UPLOAD_FOLDER, photo)
-        if os.path.exists(file_path):
-            backup_files.append(file_path)
-
-    # Quiesce database
-    db.session.commit()
-    db.session.remove()
-    db.engine.dispose()
-
-    for file in backup_files:
-        with open(file, "rb") as f:
-            file_data = f.read()
-            backup_hasher.update(file_data)
-            file_hash = hashlib.sha256(file_data).hexdigest()
-
-            manifest["files"].append(
-                {"name": os.path.basename(file), "hash": file_hash}
-            )
-    manifest["hash"] = backup_hasher.hexdigest()
+    
+    # Export database tables to JSON
+    db_data = {
+        "batches": [],
+        "trays": [],
+        "bags": [],
+        "photos": []
+    }
+    
+    # Export all batches and their relationships
+    batches = db.session.query(Batch).all()
+    for batch in batches:
+        batch_data = {
+            "id": batch.id,
+            "start_date": batch.start_date.isoformat(),
+            "end_date": batch.end_date.isoformat() if batch.end_date else None,
+            "notes": batch.notes,
+            "status": batch.status
+        }
+        db_data["batches"].append(batch_data)
+    
+    # Export all trays
+    trays = db.session.query(Tray).all()
+    for tray in trays:
+        tray_data = {
+            "id": tray.id,
+            "batch_id": tray.batch_id,
+            "contents": tray.contents,
+            "starting_weight": tray.starting_weight,
+            "ending_weight": tray.ending_weight,
+            "previous_weight": tray.previous_weight,
+            "tare_weight": tray.tare_weight,
+            "notes": tray.notes,
+            "position": tray.position
+        }
+        db_data["trays"].append(tray_data)
+    
+    # Export all bags
+    bags = db.session.query(Bag).all()
+    for bag in bags:
+        bag_data = {
+            "id": bag.id,
+            "batch_id": bag.batch_id,
+            "contents": bag.contents,
+            "weight": bag.weight,
+            "location": bag.location,
+            "notes": bag.notes,
+            "water_needed": bag.water_needed,
+            "created_date": bag.created_date.isoformat(),
+            "consumed_date": bag.consumed_date.isoformat() if bag.consumed_date else None
+        }
+        db_data["bags"].append(bag_data)
+    
+    # Export all photos
+    photos = db.session.query(Photo).all()
+    for photo in photos:
+        photo_data = {
+            "id": photo.id,
+            "batch_id": photo.batch_id,
+            "filename": photo.filename,
+            "caption": photo.caption
+        }
+        db_data["photos"].append(photo_data)
 
     backup = BytesIO()
     with ZipFile(backup, "w") as zip_file:
+        # Add database JSON to zip
+        db_json = json.dumps(db_data, indent=4)
+        backup_hasher.update(db_json.encode())
+        manifest["files"].append({
+            "name": "database.json",
+            "hash": hashlib.sha256(db_json.encode()).hexdigest()
+        })
+        zip_file.writestr("database.json", db_json)
+        
+        # Add photos to zip
+        for photo in photos:
+            file_path = os.path.join(UPLOAD_FOLDER, photo.filename)
+            if os.path.exists(file_path):
+                with open(file_path, "rb") as f:
+                    file_data = f.read()
+                    backup_hasher.update(file_data)
+                    manifest["files"].append({
+                        "name": photo.filename,
+                        "hash": hashlib.sha256(file_data).hexdigest()
+                    })
+                    zip_file.writestr(photo.filename, file_data)
+        
+        manifest["hash"] = backup_hasher.hexdigest()
         zip_file.writestr("manifest.json", json.dumps(manifest, indent=4))
-        for file_path in backup_files:
-            zip_file.write(file_path, os.path.basename(file_path))
 
     backup.seek(0)
     return backup
-
 
 
 @app.route("/restore", methods=["GET", "POST"])
@@ -785,10 +909,13 @@ def restore_backup(snapshot=None):
                 flash("Invalid backup file: no manifest", "danger")
                 return render_template(template)
 
+            if "database.json" not in found_files:
+                flash("Invalid backup file: no database export", "danger")
+                return render_template(template)
+
             manifest = json.loads(zip_file.read("manifest.json"))
             manifest_hashes = {file_entry["name"]: file_entry["hash"] for file_entry in manifest["files"]}
-            expected_files = {file_entry["name"]
-                              for file_entry in manifest["files"]} | {"manifest.json"}
+            expected_files = {file_entry["name"] for file_entry in manifest["files"]} | {"manifest.json"}
             missing_files = expected_files - found_files
             extra_files = found_files - expected_files
 
@@ -800,46 +927,33 @@ def restore_backup(snapshot=None):
                 flash(f"Extra files in backup: {', '.join(extra_files)}", "danger")
                 return render_template(template)
 
-            if "freezedry.db" not in found_files:
-                flash("Invalid backup file: no database", "danger")
+            # Verify database.json structure
+            db_data = json.loads(zip_file.read("database.json"))
+            required_tables = {"batches", "trays", "bags", "photos"}
+            if not all(table in db_data for table in required_tables):
+                flash("Invalid database export: missing required tables", "danger")
                 return render_template(template)
 
             # Verify hashes
             for filename, manifest_hash in manifest_hashes.items():
-                if filename != "manifest.json":
-                    file_data = zip_file.read(filename)
-                    backup_hasher.update(file_data)
-                    actual_hash = hashlib.sha256(file_data).hexdigest()
-                    if actual_hash != manifest_hash:
-                        flash(f"Hash mismatch for file {filename}", "danger")
+                file_data = zip_file.read(filename)
+                backup_hasher.update(file_data)
+                actual_hash = hashlib.sha256(file_data).hexdigest()
+                if actual_hash != manifest_hash:
+                    flash(f"Hash mismatch for file {filename}", "danger")
+                    return render_template(template)
+                if filename != "database.json" and not filename.startswith("manifest"):
+                    mime = magic.from_buffer(file_data, mime=True)
+                    if not mime.startswith("image/"):
+                        flash(f"Invalid file type: {mime}", "danger")
                         return render_template(template)
-                    if filename == "freezedry.db":
-                        mime = magic.from_buffer(file_data, mime=True)
-                        # Valid SQLite MIME types across different platforms
-                        if mime not in {
-                            "application/x-sqlite3",
-                            "application/vnd.sqlite3",
-                            "application/sqlite3",
-                            "application/x-sqlite",
-                            "application/db",
-                            "application/sqlite"
-                        }:
-                            flash(f"Invalid database file type: {mime}", "danger")
-                            return render_template(template)
-                    else:
-                        mime = magic.from_buffer(file_data, mime=True)
-                        if not mime.startswith("image/"):
-                            flash(f"Invalid file type: {mime}", "danger")
-                            return render_template(template)
 
             backup_hash = backup_hasher.hexdigest()
             if backup_hash != manifest["hash"]:
-                flash("Invalid database file: Hash mismatch!", "danger")
+                flash("Invalid backup file: Hash mismatch!", "danger")
                 return render_template(template)
 
-            # Everything is good, proceed with restoration
-
-            # Create a snapshot before wiping out the database
+            # Create snapshot before restoration
             backup_dir = os.path.join("static", "snapshots")
             os.makedirs(backup_dir, exist_ok=True)
             snapshot = create_backup_file("Snapshot before restore")
@@ -847,37 +961,73 @@ def restore_backup(snapshot=None):
             backup_path = os.path.join(backup_dir, f"snapshot_{timestamp}.zip")
             with open(backup_path, 'wb') as f:
                 f.write(snapshot.getvalue())
-            flash(f"Snapshot created", "info")
+            flash("Snapshot created", "info")
 
-            # Close database connections
-            db.session.remove()
-            db.engine.dispose()
-
-            # Get database path
-            db_path = os.path.join(
-                app.instance_path, app.config["SQLALCHEMY_DATABASE_URI"].replace("sqlite:///", ""))
-
-            # Delete existing database
-            if os.path.exists(db_path):
-                os.remove(db_path)
+            # Clear database tables
+            db.session.query(Photo).delete()
+            db.session.query(Bag).delete()
+            db.session.query(Tray).delete()
+            db.session.query(Batch).delete()
+            db.session.commit()
 
             # Clear uploads directory
             if os.path.exists(UPLOAD_FOLDER):
                 shutil.rmtree(UPLOAD_FOLDER)
             os.makedirs(UPLOAD_FOLDER)
 
-            # Extract files from backup
+            # Restore database from JSON
+            for batch_data in db_data["batches"]:
+                batch = Batch(
+                    id=batch_data["id"],
+                    start_date=datetime.fromisoformat(batch_data["start_date"]),
+                    end_date=datetime.fromisoformat(batch_data["end_date"]) if batch_data["end_date"] else None,
+                    notes=batch_data["notes"],
+                    status=batch_data["status"]
+                )
+                db.session.add(batch)
+
+            for tray_data in db_data["trays"]:
+                tray = Tray(
+                    id=tray_data["id"],
+                    batch_id=tray_data["batch_id"],
+                    contents=tray_data["contents"],
+                    starting_weight=tray_data["starting_weight"],
+                    ending_weight=tray_data["ending_weight"],
+                    previous_weight=tray_data["previous_weight"],
+                    tare_weight=tray_data["tare_weight"],
+                    notes=tray_data["notes"],
+                    position=tray_data["position"]
+                )
+                db.session.add(tray)
+
+            for bag_data in db_data["bags"]:
+                bag = Bag(
+                    id=bag_data["id"],
+                    batch_id=bag_data["batch_id"],
+                    contents=bag_data["contents"],
+                    weight=bag_data["weight"],
+                    location=bag_data["location"],
+                    notes=bag_data["notes"],
+                    water_needed=bag_data["water_needed"],
+                    created_date=datetime.fromisoformat(bag_data["created_date"]),
+                    consumed_date=datetime.fromisoformat(bag_data["consumed_date"]) if bag_data["consumed_date"] else None
+                )
+                db.session.add(bag)
+
+            for photo_data in db_data["photos"]:
+                photo = Photo(
+                    id=photo_data["id"],
+                    batch_id=photo_data["batch_id"],
+                    filename=photo_data["filename"],
+                    caption=photo_data["caption"]
+                )
+                db.session.add(photo)
+
+            db.session.commit()
+
+            # Extract photos
             for filename in zip_file.namelist():
-                if filename == "manifest.json":
-                    continue
-                elif filename == "freezedry.db":
-                    # Ensure instance directory exists
-                    os.makedirs(app.instance_path, exist_ok=True)
-                    # Extract database
-                    with zip_file.open(filename) as source, open(db_path, 'wb') as target:
-                        shutil.copyfileobj(source, target)
-                else:
-                    # Extract photos to uploads directory
+                if filename not in {"manifest.json", "database.json"}:
                     with zip_file.open(filename) as source, open(os.path.join(UPLOAD_FOLDER, filename), 'wb') as target:
                         shutil.copyfileobj(source, target)
 
@@ -886,11 +1036,9 @@ def restore_backup(snapshot=None):
     except Exception as e:
         flash(f"Invalid backup file: {e.__class__.__name__}: {str(e)}", "danger")
         return render_template(template)
-    finally:
-        # Reconnect to database
-        db.create_all()
 
     return redirect(url_for("list_batches"))
+
 
 @app.route("/snapshots", methods=["GET", "POST"])
 def manage_snapshots():
@@ -1090,7 +1238,6 @@ def highlight_search(text, search):
 @app.route("/batch_report/")
 @app.route("/batch_report/<int:id>")
 def batch_report(id=None):
-    print(f"id: {id}")
     if id:
         # Single batch report
         batch = db.session.get(Batch, id)
@@ -1535,9 +1682,9 @@ def create_bag_inventory_pdf(bags):
     doc.save()
     return buffer
 
-def add_tare_weight_if_missing():
+def update_schema():
     with app.app_context():
-        # Check if tare_weight column exists
+        # Check if tare_weight column exists in tray table
         inspector = db.inspect(db.engine)
         has_tare_weight = 'tare_weight' in [col['name'] for col in inspector.get_columns('tray')]
         
@@ -1549,9 +1696,23 @@ def add_tare_weight_if_missing():
                 conn.execute(db.text('UPDATE tray SET tare_weight = 0'))
                 conn.commit()
 
+        # Check if uploaded_at column exists in photo table
+        has_uploaded_at = 'uploaded_at' in [col['name'] for col in inspector.get_columns('photo')]
+        
+        if has_uploaded_at:
+            # Remove the column
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE photo DROP COLUMN uploaded_at'))
+                conn.commit()
+
 
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()
-        add_tare_weight_if_missing()
-    app.run(debug=True, host=flask_host, port=flask_port)
+        try:
+            if test_db_connection():
+                db.create_all()
+                update_schema()
+            app.run(debug=True, host=flask_host, port=flask_port)
+        except Exception as e:
+            print(f"Error: {e}")
+            app.run(debug=True, host=flask_host, port=flask_port)
