@@ -33,7 +33,7 @@ A web application for tracking freeze-dried food batches. This tool allows you t
 
 - **Backend**: Flask (Python)
 - **Frontend**: Jinja2 templates with Bootstrap 5
-- **Database**: SQLite
+- **Database**: SQLite or MySQL
 - **Other Tools**:
   - QR code generation
   - ReportLab for PDF label creation
