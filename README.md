@@ -96,6 +96,7 @@ A web application for tracking freeze-dried food batches. This tool allows you t
    - Split tray contents into bags, recording their weights and storage locations.
    - Create and print labels for bags with QR codes linking to batch details.
    - Scan QR Code on bag label to quickly pull up batch on smart-phone and mark bag as consumed or view batch details
+   - Print bag inventory reports by food storage location
 
 4. **Manage Inventory**:
    - View and search through batches, trays, and bags.
