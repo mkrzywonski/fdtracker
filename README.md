@@ -7,6 +7,7 @@ A web application for tracking freeze-dried food batches. This tool allows you t
 - **User Interface**
   - Thumb-friendly design for use on smartphone
   - No need for a full desktop setup in your food prep area
+  - Web based app can be used on almost any device
     
 - **Batch Management**:
   - Create, view, edit, and delete batches.
@@ -34,10 +35,18 @@ A web application for tracking freeze-dried food batches. This tool allows you t
   - Can be run on a Raspberry PI or other small computer.
   - The author runs the app on a Raspberry Pi Zero 2 W
 
+- **Backup / Restore**
+  - Download your data as a simple .zip file for safe keeping
+  - Restore database from any previous backup
+    
+- **Snapshots**
+   - Create backup files on server without having to download them
+   - Restore database snapshots from a previous point in time
+
 ## Technologies Used
 
 - **Backend**: Flask (Python)
-- **Frontend**: Jinja2 templates with Bootstrap 5
+- **Frontend**: Jinja2 templates with Bootstrap 5 CSS
 - **Database**: SQLite or MySQL
 - **Other Tools**:
   - QR code generation
