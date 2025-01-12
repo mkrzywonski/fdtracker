@@ -154,6 +154,7 @@ This guide will walk you through setting up the Freeze Dry Tracker application o
    server {
        listen 80;
        server_name fdtracker.local;
+       client_max_body_size 1G;
 
        location / {
            proxy_pass http://127.0.0.1:5000;
