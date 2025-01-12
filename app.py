@@ -105,6 +105,8 @@ if public_url:
 
 # Initialize database
 db.init_app(app)
+with app.app_context():
+    db.create_all()
 
 # Set up upload directory
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)

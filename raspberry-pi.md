@@ -113,6 +113,46 @@ This guide will walk you through setting up the Freeze Dry Tracker application o
 
 ---
 
+## 9. Set Up Nginx as a Reverse Proxy
+
+1. Install Nginx:
+   ```bash
+   sudo apt install nginx
+   ```
+2. Create an Nginx configuration file for the application:
+   ```bash
+   sudo nano /etc/nginx/sites-available/fdtracker
+   ```
+   Add the following content:
+   ```nginx
+   server {
+       listen 80;
+       server_name fdtracker.local;
+
+       location / {
+           proxy_pass http://127.0.0.1:5000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
+   ```
+3. Enable the configuration:
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/fdtracker /etc/nginx/sites-enabled/
+   ```
+4. Test the Nginx configuration:
+   ```bash
+   sudo nginx -t
+   ```
+5. Restart Nginx to apply the changes:
+   ```bash
+   sudo systemctl restart nginx
+   ```
+
+---
+
 ## Accessing the Application
 
 Once the setup is complete, you can access the application in your browser at:

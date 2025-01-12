@@ -14,7 +14,7 @@ WorkingDirectory=/home/fd/fdtracker
 Environment="PATH=/home/fd/fdtracker/.venv/bin"
 
 # The command to start your Flask app via Gunicorn
-ExecStart=/home/fd/fdtracker/.venv/bin/gunicorn --bind 127.0.0.1:5000 wsgi:app
+ExecStart=/home/fd/fdtracker/.venv/bin/gunicorn --bind 127.0.0.1:5000 app:app
 
 # Automatically restart if the service crashes
 Restart=always
