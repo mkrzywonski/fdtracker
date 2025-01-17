@@ -5,10 +5,12 @@ import json
 import os
 import re
 import shutil
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 from io import BytesIO
 from urllib.parse import urlparse
 from zipfile import ZipFile
+from openai import OpenAI
+from flask import session
 
 # Third-party imports
 import magic
@@ -51,7 +53,9 @@ from utils import (
     water_volume_imperial,
     water_volume_metric,
     weight_imperial,
-    test_db_connection
+    test_db_connection,
+    cosine_similarity,
+    get_database_context
 )
 
 
@@ -73,6 +77,7 @@ SUPPORTED_MIME_TYPES = {
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.permanent_session_lifetime = timedelta(days=1)
 
 # Load configuration file
 config = configparser.ConfigParser()
@@ -1706,6 +1711,66 @@ def update_schema():
             with db.engine.connect() as conn:
                 conn.execute(db.text('ALTER TABLE photo DROP COLUMN uploaded_at'))
                 conn.commit()
+
+@app.route("/ai", methods=["GET", "POST"])
+def ai_chat():
+    session.permanent = True
+    openai_key = config.get("openai", "api_key", fallback=None)
+    if not openai_key:
+        flash("OpenAI API key not configured", "danger")
+        return redirect(request.referrer or url_for("root"))
+
+    client = OpenAI(api_key=openai_key)
+
+    # Clear chat history if coming from a different page
+    if request.referrer and url_for('ai_chat') not in request.referrer:
+        session.pop("chat_history", None)
+    
+    referrer = request.form.get("referrer") or request.referrer or url_for("root")
+    if url_for("ai_chat") in referrer:
+        referrer = url_for("root")
+    
+    if "chat_history" not in session:
+        session["chat_history"] = []
+    
+    if request.method == "POST":
+        question = request.form.get("question", "").strip()
+        if question:
+            context = get_database_context(question, client)
+
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant for a freeze-drying application. Focus on the current question using this database context: " + context},
+                *session.get("chat_history", []),
+                {"role": "user", "content": question}
+            ]
+            
+
+            try:
+                response = client.chat.completions.create(
+                    model = config.get("openai", "model", fallback="gpt-5-turbo"),
+                    messages=messages
+                )
+                
+                answer = response.choices[0].message.content
+                session["chat_history"].extend([
+                    {"role": "user", "content": question},
+                    {"role": "assistant", "content": answer}
+                ])
+                
+            except Exception as e:
+                flash(f"Error getting AI response: {str(e)}", "danger")
+                
+    return render_template(
+        "ai_chat.html",
+        chat_history=session.get("chat_history", []),
+        referrer=referrer
+    )
+
+@app.context_processor
+def utility_processor():
+    return {
+        'openai_enabled': config.getboolean('openai', 'enabled', fallback=False)
+    }
 
 
 if __name__ == "__main__":
