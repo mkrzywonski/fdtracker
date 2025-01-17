@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<script>
+    document.getElementById('page_title').textContent = "AI Assistant";
+</script>
+
+<!-- AI Conversation -->
+{% if chat_history %}
+<div class="card border border-dark mb-4">
+    <div class="card-header bg-dark text-white">
+        Conversation
+    </div>
+    <div class="card-body">
+        {% for message in chat_history %}
+        <div class="card border border-dark mb-4">
+            <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
+                <span>{{ "You" if message.role == "user" else "Assistant" }}</span>
+            </div>
+            <div class="card-body">
+                {{ message.content }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Question Card -->
+<div class="card border border-dark mb-4">
+    <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
+        <span class="text-white">Ask a question</span>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            <input type="hidden" name="referrer" value="{{ referrer }}">
+            <textarea class="form-control mb-3" id="question" name="question" rows="3"></textarea>
+            <button type="submit" name="ask" class="btn btn-secondary border-dark text-white w-25">
+                Ask
+            </button>
+            <a href="{{ referrer }}" class="btn btn-secondary border-dark text-white w-25">Quit</a>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Scroll to bottom of conversation on page load
+    window.onload = function() {
+        document.documentElement.scrollTop = document.documentElement.scrollHeight;
+    }
+    
+    // Also scroll when submitting new questions
+    document.querySelector('form').onsubmit = function() {
+        setTimeout(function() {
+            document.documentElement.scrollTop = document.documentElement.scrollHeight;
+        }, 100);
+    }
+</script>
+
+{% endblock %}

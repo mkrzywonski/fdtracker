@@ -19,20 +19,19 @@
     {% for category, message in messages %}
     <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
         {% if category == 'info' %}
-            <i class="bi bi-info-circle me-3"></i>
+        <i class="bi bi-info-circle me-3"></i>
         {% elif category == 'danger' %}
-            <i class="bi bi-exclamation-triangle me-3"></i>
+        <i class="bi bi-exclamation-triangle me-3"></i>
         {% elif category == 'success' %}
-            <i class="bi bi-check-circle me-3"></i>
+        <i class="bi bi-check-circle me-3"></i>
         {% else %}
-            <i class="bi bi-exclamation-circle me-3"></i>
+        <i class="bi bi-exclamation-circle me-3"></i>
         {% endif %}
         {{ message }}</span>
     </div>
     {% endfor %}
     {% endif %}
     {% endwith %}
-
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid">
             <!-- Navbar brand aligned to the left -->
@@ -49,10 +48,9 @@
                 <ul class="navbar-nav flex-column align-items-end">
                     <!-- New Batch -->
                     <li class="nav-item mb-4">
-                        <a href="{{ url_for('add_batch') }}" type="button"
-                        class="btn btn-dark flex-fill"><span>
-                        <i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i>
-                        <span class="mb-3">New Batch</span></span></a>
+                        <a href="{{ url_for('add_batch') }}" type="button" class="btn btn-dark flex-fill"><span>
+                                <i style="position: relative; top: -4px;">{{ freezedryer_icon() }}</i>
+                                <span class="mb-3">New Batch</span></span></a>
                     </li>
                     <li class="nav-item mb-4">
                         <a class="btn btn-dark" href="{{ url_for('list_batches') }}">
@@ -64,6 +62,14 @@
                         <a class="btn btn-dark" href="{{ url_for('list_bags') }}">
                             <i class="bi bi-bag me-3"></i>View Bags</a>
                     </li>
+                    {% if openai_enabled %}
+                    <li>
+                        <a class="btn btn-dark" href="{{ url_for('ai_chat') }}">
+                            <i class="bi bi-chat-right-text"></i> AI Chat
+                        </a>
+                    </li>
+                    {% endif %}
+
                     <!-- Tools menu -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="toolsDropdown" role="button"

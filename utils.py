@@ -1,6 +1,8 @@
 # Standard library imports
 import hashlib
 import os
+import json
+import configparser
 from datetime import datetime
 
 # Third-party imports
@@ -151,3 +153,88 @@ def test_db_connection():
     finally:
         if db.session.is_active:
             db.session.rollback()
+
+def format_list(items):
+    if not items:
+        return "nothing"
+    if len(items) == 1:
+        return str(items[0])
+    return f"{', '.join(str(x) for x in items[:-1])} and {items[-1]}"
+
+
+def cosine_similarity(v1, v2):
+    dot_product = sum(x*y for x, y in zip(v1, v2))
+    magnitude1 = sum(x*x for x in v1) ** 0.5
+    magnitude2 = sum(x*x for x in v2) ** 0.5
+    return dot_product / (magnitude1 * magnitude2)
+
+def get_database_context(question, client):
+    SIMILARITY_THRESHOLD = 0.8
+    # Get relevant data from database
+    batches = db.session.query(Batch).all()
+    trays = db.session.query(Tray).all()
+    bags = db.session.query(Bag).all()
+
+    # Create text representations
+    context_texts = []
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    if 'openai' in config:
+        context_texts.append(config['openai'].get('context', ''))
+
+    for batch in batches:
+        context_texts.append(f"Batch {batch.id} created on {batch.start_date.strftime('%Y-%m-%d')} "
+        f"contains {format_list([tray.contents for tray in batch.trays])}. "
+        f"Status: {batch.status}, Batch Notes: '{batch.notes}'")  
+
+    tray_descriptions = []
+    for t in trays:
+        net_starting_weight = t.starting_weight - t.tare_weight
+        net_ending_weight = (t.ending_weight - t.tare_weight) if t.ending_weight else None
+        weight_info = f"started at {net_starting_weight}g"
+        if net_ending_weight:
+            weight_info += f", finished at {net_ending_weight}g"
+        context_texts.append(
+            f"Tray {t.id} at position {t.position} in batch {t.batch.id} contains {t.contents}, {weight_info}, Tray Notes: '{t.notes}'"
+        )
+
+    for bag in bags:
+        created_date = bag.created_date.strftime("%Y-%m-%d")
+        if bag.consumed_date:
+            status = f"Consumed on {bag.consumed_date.strftime('%Y-%m-%d')}"
+        else:
+            status = "Not yet consumed"
+        context_texts.append(f"Bag {bag.id} containing {bag.contents} was created from batch {bag.batch.id} on {created_date}, "
+        f"Status: {status}, Storage Location: {bag.location}, Weight: {bag.weight}g, Bag Notes: '{bag.notes}'")
+
+    print(f"context_texts: {context_texts}")
+
+    # Get embeddings
+    response = client.embeddings.create(
+        model="text-embedding-ada-002",
+        input=[question] + context_texts
+    )
+    
+    # Find most relevant context using cosine similarity
+    question_embedding = response.data[0].embedding
+    context_embeddings = [item.embedding for item in response.data[1:]]
+    
+    # Calculate similarities and filter by threshold
+    similarities = [cosine_similarity(question_embedding, ce) for ce in context_embeddings]
+    context_with_scores = list(zip(similarities, context_texts))
+    
+    # Sort by similarity score in descending order
+    sorted_contexts = sorted(context_with_scores, key=lambda x: x[0], reverse=True)
+    print(f"sorted_contexts: {sorted_contexts}")
+    
+    # Filter contexts above threshold and take only the text portion
+    relevant_contexts = [
+        context for score, context in sorted_contexts 
+        if score >= SIMILARITY_THRESHOLD
+    ]
+    if not relevant_contexts:
+        relevant_contexts.append("No matching records found in the database.")
+
+    print(f"contexts:")
+    print("\n".join(relevant_contexts[:100]))
+    return "\n".join(relevant_contexts[:100])

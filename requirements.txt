@@ -5,4 +5,5 @@ reportlab
 pillow
 python-magic
 pymysql
+openai
 
