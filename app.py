@@ -1,63 +1,68 @@
-# Standard library imports
-import configparser
-import hashlib
-import json
-import os
-import re
-import shutil
-from datetime import datetime, UTC, timedelta
-from io import BytesIO
-from urllib.parse import urlparse
-from zipfile import ZipFile
-from openai import OpenAI
-from flask import session
+try:
+    # Standard library imports
+    import configparser
+    import hashlib
+    import json
+    import os
+    import re
+    import shutil
+    from datetime import datetime, UTC, timedelta
+    from io import BytesIO
+    from urllib.parse import urlparse
+    from zipfile import ZipFile
+    from openai import OpenAI
+    from flask import session
 
-# Third-party imports
-import magic
-import qrcode
-from flask import (
-    Flask,
-    current_app,
-    flash,
-    redirect,
-    render_template,
-    request,
-    send_file,
-    send_from_directory,
-    url_for
-)
-from flask_sqlalchemy import SQLAlchemy
-from markupsafe import Markup
-from PIL import Image
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import inch, letter
-from reportlab.lib.utils import ImageReader, simpleSplit
-from reportlab.pdfgen import canvas
-from werkzeug.exceptions import RequestEntityTooLarge
-from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug.utils import secure_filename
+    # Third-party imports
+    import magic
+    import qrcode
+    from flask import (
+        Flask,
+        current_app,
+        flash,
+        redirect,
+        render_template,
+        request,
+        send_file,
+        send_from_directory,
+        url_for
+    )
+    from flask_sqlalchemy import SQLAlchemy
+    from markupsafe import Markup
+    from PIL import Image
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import inch, letter
+    from reportlab.lib.utils import ImageReader, simpleSplit
+    from reportlab.pdfgen import canvas
+    from werkzeug.exceptions import RequestEntityTooLarge
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    from werkzeug.utils import secure_filename
 
-# Local imports
-from models import Bag, Batch, Photo, Tray, db
-from pdf_helpers import (
-    align_text,
-    draw_image,
-    draw_page_border,
-    draw_wrapped_text,
-    start_new_page
-)
-from utils import (
-    format_bytes_size,
-    search_bags,
-    search_batches,
-    water_volume_imperial,
-    water_volume_metric,
-    weight_imperial,
-    test_db_connection,
-    cosine_similarity,
-    get_database_context
-)
-
+    # Local imports
+    from models import Bag, Batch, Photo, Tray, db
+    from pdf_helpers import (
+        align_text,
+        draw_image,
+        draw_page_border,
+        draw_wrapped_text,
+        start_new_page
+    )
+    from utils import (
+        format_bytes_size,
+        search_bags,
+        search_batches,
+        water_volume_imperial,
+        water_volume_metric,
+        weight_imperial,
+        test_db_connection,
+        cosine_similarity,
+        get_database_context
+    )
+except ImportError as e:
+    print("\nMissing required package. Please run:")
+    print("pip install -r requirements.txt")
+    print(f"\nSpecific error: {str(e)}")
+    exit(1)
 
 # Constants
 PER_PAGE = 25
