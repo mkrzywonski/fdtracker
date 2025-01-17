@@ -43,6 +43,12 @@ A web application for tracking freeze-dried food batches. This tool allows you t
    - Create backup files on server without having to download them
    - Restore database snapshots from a previous point in time
 
+- ChatGPT Assistant
+   - Ask ChatGPT about freeze drying, or about items in your database
+   - Have I run any batches that contain strawberries?
+   - Are there any bags of tomatoes left that have not been cosumed?
+   - **Requires OpenAI API Key
+
 ## Technologies Used
 
 - **Backend**: Flask (Python)
