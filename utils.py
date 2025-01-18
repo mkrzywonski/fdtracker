@@ -182,6 +182,24 @@ def get_database_context(question, client):
     if 'openai' in config:
         context_texts.append(config['openai'].get('context', ''))
 
+    # Summary Statistics
+    total_batches = len(batches)
+    in_progress_batches = sum(1 for batch in batches if batch.status == "In Progress")
+    completed_batches = total_batches - in_progress_batches
+    total_trays = len(trays)
+    total_bags = len(bags)
+    consumed_bags = sum(1 for bag in bags if bag.consumed_date)
+    available_bags = total_bags - consumed_bags
+
+    # Add statistics to context
+    context_texts.append(
+        f"The database contains a total of {total_batches} batches: {in_progress_batches} in progress and {completed_batches} completed."
+    )
+    context_texts.append(
+        f"The database contains a total of {total_bags} bags: {available_bags} available and {consumed_bags} consumed."
+    )
+    context_texts.append(f"The database contains a total of {total_trays} trays.")
+
     for batch in batches:
         context_texts.append(f"Batch {batch.id} created on {batch.start_date.strftime('%Y-%m-%d')} "
         f"contains {format_list([tray.contents for tray in batch.trays])}. "
@@ -205,9 +223,7 @@ def get_database_context(question, client):
         else:
             status = "Not yet consumed"
         context_texts.append(f"Bag {bag.id} containing {bag.contents} was created from batch {bag.batch.id} on {created_date}, "
-        f"Status: {status}, Storage Location: {bag.location}, Weight: {bag.weight}g, Bag Notes: '{bag.notes}'")
-
-    print(f"context_texts: {context_texts}")
+        f"Status: {status}, Storage Location: {bag.location}, Weight: {bag.weight}g, Water Needed: {bag.water_needed}, Bag Notes: '{bag.notes}'")
 
     # Get embeddings
     response = client.embeddings.create(
@@ -225,7 +241,6 @@ def get_database_context(question, client):
     
     # Sort by similarity score in descending order
     sorted_contexts = sorted(context_with_scores, key=lambda x: x[0], reverse=True)
-    print(f"sorted_contexts: {sorted_contexts}")
     
     # Filter contexts above threshold and take only the text portion
     relevant_contexts = [
@@ -235,6 +250,4 @@ def get_database_context(question, client):
     if not relevant_contexts:
         relevant_contexts.append("No matching records found in the database.")
 
-    print(f"contexts:")
-    print("\n".join(relevant_contexts[:100]))
     return "\n".join(relevant_contexts[:100])

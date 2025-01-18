@@ -10,7 +10,6 @@ try:
     from io import BytesIO
     from urllib.parse import urlparse
     from zipfile import ZipFile
-    from openai import OpenAI
     from flask import session
 
     # Third-party imports
@@ -29,6 +28,7 @@ try:
     )
     from flask_sqlalchemy import SQLAlchemy
     from markupsafe import Markup
+    from openai import OpenAI
     from PIL import Image
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import inch, letter
@@ -1727,6 +1727,11 @@ def ai_chat():
 
     client = OpenAI(api_key=openai_key)
 
+    model = config.get("openai", "model", fallback="gpt-3.5-turbo"),
+
+    with open("system_prompt.txt") as f:
+        system_prompt = f.read().strip()
+
     # Clear chat history if coming from a different page
     if request.referrer and url_for('ai_chat') not in request.referrer:
         session.pop("chat_history", None)
@@ -1744,15 +1749,14 @@ def ai_chat():
             context = get_database_context(question, client)
 
             messages = [
-                {"role": "system", "content": "You are a helpful assistant for a freeze-drying application. Focus on the current question using this database context: " + context},
+                {"role": "system", "content":  system_prompt + context},
                 *session.get("chat_history", []),
                 {"role": "user", "content": question}
             ]
             
-
             try:
                 response = client.chat.completions.create(
-                    model = config.get("openai", "model", fallback="gpt-5-turbo"),
+                    model = config.get("openai", "model", fallback="gpt-3.5-turbo"),
                     messages=messages
                 )
                 

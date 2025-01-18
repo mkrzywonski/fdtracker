@@ -15,8 +15,11 @@
         <div class="card border border-dark mb-4">
             <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
                 <span>{{ "You" if message.role == "user" else "Assistant" }}</span>
+                {% if message.role == "assistant" %}
+                    <button type="button" onclick="speakText(document.getElementById('response-{{ loop.index }}').textContent)" class="btn btn-dark border-white bi-volume-up me-3"></button>
+                {% endif %}
             </div>
-            <div class="card-body">
+            <div id="response-{{ loop.index }}" class="card-body">
                 {{ message.content }}
             </div>
         </div>
@@ -54,6 +57,32 @@
             document.documentElement.scrollTop = document.documentElement.scrollHeight;
         }, 100);
     }
+
+    // Function to read the latest AI response
+    function readLatestResponse() {
+        const chatHistory = {{ chat_history|tojson|safe }};
+        if (chatHistory && chatHistory.length > 0) {
+            const lastMessage = chatHistory[chatHistory.length - 1];
+            if (lastMessage.role === "assistant") {
+                speakText(lastMessage.content);
+            }
+        }
+    }
+
+    // Text-to-Speech function
+    function speakText(text) {
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US'; // Set language
+            utterance.pitch = 1;      // Set pitch
+            utterance.rate = 1;       // Set speed
+            utterance.volume = 1;     // Set volume
+            window.speechSynthesis.speak(utterance);
+        } else {
+            console.error("Text-to-Speech is not supported in this browser.");
+        }
+    }
+
 </script>
 
 {% endblock %}
