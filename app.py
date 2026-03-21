@@ -39,7 +39,7 @@ try:
     from werkzeug.utils import secure_filename
 
     # Local imports
-    from models import Bag, Batch, Photo, Tray, db
+    from models import Bag, Batch, Photo, Tray, TrayWeightHistory, db
     from pdf_helpers import (
         align_text,
         draw_image,
@@ -115,8 +115,38 @@ if public_url:
 
 # Initialize database
 db.init_app(app)
+
+
+def backfill_weight_history():
+    """Populate weight history for trays created before history tracking was added."""
+    trays_without_history = (
+        Tray.query
+        .outerjoin(TrayWeightHistory, TrayWeightHistory.tray_id == Tray.id)
+        .filter(TrayWeightHistory.id == None)
+        .filter(Tray.starting_weight != None)
+        .all()
+    )
+    for tray in trays_without_history:
+        db.session.add(TrayWeightHistory(
+            tray_id=tray.id,
+            weight=tray.starting_weight,
+            recorded_at=tray.batch.start_date,
+            label="initial",
+        ))
+        if tray.ending_weight is not None and tray.batch.end_date is not None:
+            db.session.add(TrayWeightHistory(
+                tray_id=tray.id,
+                weight=tray.ending_weight,
+                recorded_at=tray.batch.end_date,
+                label="final",
+            ))
+    if trays_without_history:
+        db.session.commit()
+
+
 with app.app_context():
     db.create_all()
+    backfill_weight_history()
 
 # Set up upload directory
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -254,6 +284,16 @@ def add_batch():
             batch.trays.append(tray)
 
         db.session.commit()
+
+        # Record initial weight history for each tray (tray IDs now available)
+        for tray in batch.trays:
+            db.session.add(TrayWeightHistory(
+                tray_id=tray.id,
+                weight=tray.starting_weight,
+                label="initial",
+            ))
+        db.session.commit()
+
         return redirect(url_for("view_batch", id=batch.id))
 
     # Default state for a new form
@@ -286,6 +326,12 @@ def complete_batch(id):
     for tray in batch.trays:
         ending_weight = float(request.form[f"ending_weight_{tray.id}"])
         tray.ending_weight = ending_weight
+        tray.previous_weight = ending_weight
+        db.session.add(TrayWeightHistory(
+            tray_id=tray.id,
+            weight=ending_weight,
+            label="final",
+        ))
 
     batch.status = "Complete"
     batch.end_date = datetime.now(UTC)
@@ -557,8 +603,13 @@ def update_weight(id):
         # Retrieve the weight entered by the user from the form
         entered_weight = request.form.get(f"ending_weight_{tray_id}")
         if entered_weight:
-            # Save the entered weight as the tray's previous weight
-            tray.previous_weight = float(entered_weight)
+            weight_val = float(entered_weight)
+            tray.previous_weight = weight_val
+            db.session.add(TrayWeightHistory(
+                tray_id=tray.id,
+                weight=weight_val,
+                label="check",
+            ))
 
     # Commit the changes to the database
     db.session.commit()

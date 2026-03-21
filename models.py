@@ -7,7 +7,7 @@ db = SQLAlchemy()
 class Batch(db.Model):
     __tablename__ = "batch"
     id = db.Column(db.Integer, primary_key=True, index=True)
-    start_date = db.Column(db.DateTime, nullable=False, default=datetime.now(UTC))
+    start_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(UTC))
     end_date = db.Column(db.DateTime)
     notes = db.Column(db.Text, index=True)  # Add index for better search performance
     status = db.Column(db.String(20), default="In Progress")
@@ -42,6 +42,30 @@ class Tray(db.Model):
     notes = db.Column(db.Text, index=True)
     position = db.Column(db.Integer, nullable=False)  # Tray position in the machine
 
+    weight_history = db.relationship(
+        "TrayWeightHistory",
+        backref="tray",
+        cascade="all, delete-orphan",
+        order_by="TrayWeightHistory.recorded_at",
+    )
+
+
+class TrayWeightHistory(db.Model):
+    __tablename__ = "tray_weight_history"
+    id = db.Column(db.Integer, primary_key=True)
+    tray_id = db.Column(
+        db.Integer,
+        db.ForeignKey("tray.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    weight = db.Column(db.Float, nullable=False)
+    recorded_at = db.Column(
+        db.DateTime, nullable=False, default=lambda: datetime.now(UTC)
+    )
+    label = db.Column(db.String(20), nullable=False, default="check")
+    # label values: "initial", "check", "final"
+
 
 class Bag(db.Model):
     __tablename__ = "bag"
@@ -57,7 +81,7 @@ class Bag(db.Model):
     location = db.Column(db.String(100), index=True)
     notes = db.Column(db.Text, index=True)
     water_needed = db.Column(db.Float)
-    created_date = db.Column(db.DateTime, default=datetime.now(UTC), index=True)
+    created_date = db.Column(db.DateTime, default=lambda: datetime.now(UTC), index=True)
     consumed_date = db.Column(db.DateTime)
 
 
