@@ -53,7 +53,8 @@
                 <span class="me-2" style="white-space: nowrap;">Tray {{ tray.position }}:</span>
                 <textarea class="form-control mx-2" id="tray-{{ tray.id }}" name="tray-{{ tray.id }}"
                     rows="1">{{ tray.contents }}</textarea>
-                <div class="ms-auto" style="white-space: nowrap;">
+                <div class="ms-auto d-flex align-items-center gap-2" style="white-space: nowrap;">
+                    <a href="{{ url_for('edit_tray', id=tray.id) }}" class="btn btn-sm btn-secondary border-dark"><i class="bi bi-pencil"></i></a>
                     <label>
                         <input type="checkbox" class="checkbox" name="delete_tray" value="{{ tray.id }}"> <i
                             class="bi bi-trash ms-2"></i>
