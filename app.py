@@ -544,6 +544,73 @@ def edit_tray(id):
     return render_template("edit_tray.html", tray=tray)
 
 
+@app.route("/add_tray/<int:batch_id>", methods=["GET", "POST"])
+def add_tray(batch_id):
+    batch = db.session.get(Batch, batch_id)
+    if batch is None:
+        flash(f"Batch {batch_id} not found", "danger")
+        return redirect(url_for("list_batches"))
+
+    if request.method == "POST":
+        contents = request.form.get("contents", "")
+        starting_weight = request.form.get("starting_weight", "")
+        tare_weight = request.form.get("tare_weight", 0)
+        notes = request.form.get("notes", "")
+        error = False
+
+        try:
+            starting_weight = float(starting_weight)
+            if starting_weight <= 0:
+                flash("Initial weight must be greater than 0.", "danger")
+                error = True
+        except (ValueError, TypeError):
+            flash("Initial weight must be a valid number.", "danger")
+            error = True
+
+        try:
+            tare_weight = float(tare_weight)
+            if not error and starting_weight < tare_weight:
+                flash("Initial weight must be greater than empty tray weight.", "danger")
+                error = True
+        except (ValueError, TypeError):
+            flash("Empty tray weight must be a valid number.", "danger")
+            error = True
+
+        if error:
+            return render_template("add_tray.html", batch=batch,
+                                   contents=contents,
+                                   starting_weight=starting_weight if isinstance(starting_weight, float) else "",
+                                   tare_weight=tare_weight if isinstance(tare_weight, float) else 0,
+                                   notes=notes)
+
+        next_position = max((t.position for t in batch.trays), default=0) + 1
+        tray = Tray(
+            contents=contents,
+            starting_weight=starting_weight,
+            tare_weight=tare_weight,
+            notes=notes,
+            position=next_position,
+        )
+        batch.trays.append(tray)
+        db.session.commit()
+
+        db.session.add(TrayWeightHistory(
+            tray_id=tray.id,
+            weight=tray.starting_weight,
+            label="initial",
+        ))
+        db.session.commit()
+
+        return redirect(url_for("edit_batch", id=batch_id))
+
+    last_tray = max(batch.trays, key=lambda t: t.position, default=None)
+    return render_template("add_tray.html", batch=batch,
+                           contents=last_tray.contents if last_tray else "",
+                           starting_weight="",
+                           tare_weight=last_tray.tare_weight if last_tray else 0,
+                           notes=last_tray.notes if last_tray else "")
+
+
 @app.route("/edit_bag/<string:id>", methods=["GET", "POST"])
 def edit_bag(id):
     bag = db.session.get(Bag, id)

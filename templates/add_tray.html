@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+{# Set the page title #}
+<script>
+    document.getElementById('page_title').textContent = 'Batch {{ ' %08d' % batch.id }} Add Tray';
+</script>
+
+{# action buttons #}
+<div class="d-flex gap-2 w-100 mb-3">
+    <a href="{{ url_for('edit_batch', id=batch.id) }}" type="button"
+        class="btn btn-secondary border-dark flex-fill"><i class="bi bi-arrow-left"></i> Back</a>
+</div>
+
+<div class="card border border-dark mb-4">
+    <div class="card-header bg-dark text-white">
+        Add Tray
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('add_tray', batch_id=batch.id) }}">
+            <div class="mb-3">
+                <label for="contents" class="form-label">Contents</label>
+                <input type="text" class="form-control" id="contents" name="contents" value="{{ contents }}" required>
+            </div>
+            <div class="mb-3">
+                <label for="tare_weight" class="form-label">Empty Tray Weight (g)</label>
+                <input type="number" step="0.01" class="form-control" id="tare_weight" name="tare_weight"
+                    value="{{ tare_weight }}">
+            </div>
+            <div class="mb-3">
+                <label for="starting_weight" class="form-label">Initial Weight (g)</label>
+                <input type="number" step="0.01" class="form-control" id="starting_weight" name="starting_weight"
+                    value="{{ starting_weight }}">
+            </div>
+            <div class="mb-3">
+                <label for="notes" class="form-label">Notes</label>
+                <textarea class="form-control" id="notes" name="notes" rows="3">{{ notes }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-secondary border-dark">Add Tray</button>
+            <a href="{{ url_for('edit_batch', id=batch.id) }}" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
