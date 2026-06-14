@@ -23,8 +23,13 @@
     <div id="trayContainer" data-trays="{{ trays | tojson | safe }}">
         {% for i in range(tray_count) %}
         <div class="card border border-dark mb-3">
-            <div class="card-header mb-2 bg-dark text-white">X Tray {{ i + 1 }} X</div>
+            <div class="card-header mb-2 bg-dark text-white">{{ trays[i]['name'] if trays|length > i and trays[i]['name'] else 'Tray ' ~ (i + 1) }}</div>
             <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Tray Name (optional)</label>
+                    <input type="text" name="name_{{ i }}" class="form-control"
+                        value="{{ trays[i]['name'] if trays|length > i else '' }}" placeholder="e.g. Tray #6">
+                </div>
                 <div class="mb-3">
                     <label class="form-label">Contents</label>
                     <input type="text" name="contents_{{ i }}" class="form-control"
@@ -73,6 +78,7 @@
         const existingTrays = container.querySelectorAll('.card');
         existingTrays.forEach((tray, index) => {
             savedTrays[index] = {
+                name: tray.querySelector('[name^="name_"]').value,
                 contents: tray.querySelector('[name^="contents_"]').value,
                 starting_weight: tray.querySelector('[name^="starting_weight_"]').value,
                 tare_weight: tray.querySelector('[name^="tare_weight_"]').value,
@@ -84,12 +90,16 @@
 
         for (let i = 0; i < count; i++) {
             // Use saved data if available, otherwise empty strings
-            const tray = savedTrays[i] || { contents: '', starting_weight: '', tare_weight: '0', notes: '' };
+            const tray = savedTrays[i] || { name: '', contents: '', starting_weight: '', tare_weight: '0', notes: '' };
 
             container.innerHTML += `
             <div class="card border border-dark mb-3">
-                <div class="card-header mb-2 bg-dark text-white">Tray ${i + 1}</div>
+                <div class="card-header mb-2 bg-dark text-white">${tray.name || 'Tray ' + (i + 1)}</div>
                 <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tray Name (optional)</label>
+                        <input type="text" name="name_${i}" class="form-control" value="${tray.name}" placeholder="e.g. Tray #6">
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Contents</label>
                         <input type="text" name="contents_${i}" class="form-control" value="${tray.contents}" required>

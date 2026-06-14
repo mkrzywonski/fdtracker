@@ -144,8 +144,24 @@ def backfill_weight_history():
         db.session.commit()
 
 
+def ensure_tray_name_column():
+    """Add the tray.name column to pre-existing databases.
+
+    db.create_all() does not alter existing tables, so databases created before
+    this column was added need an explicit ALTER. Idempotent and safe to run on
+    every startup.
+    """
+    inspector = db.inspect(db.engine)
+    columns = [col["name"] for col in inspector.get_columns("tray")]
+    if "name" not in columns:
+        with db.engine.connect() as conn:
+            conn.execute(db.text("ALTER TABLE tray ADD COLUMN name VARCHAR(50)"))
+            conn.commit()
+
+
 with app.app_context():
     db.create_all()
+    ensure_tray_name_column()
     backfill_weight_history()
 
 # Set up upload directory
@@ -227,31 +243,36 @@ def add_batch():
         # Validate tray weights and gather data
         for i in range(tray_count):
             contents = request.form.get(f"contents_{i}", "")
+            name = request.form.get(f"name_{i}", "").strip()
             starting_weight = request.form.get(f"starting_weight_{i}", "")
             tare_weight = request.form.get(f"tare_weight_{i}", 0)
             notes = request.form.get(f"notes_{i}", "")
 
+            # Label used in validation messages (name if given, else position index)
+            label = name or f"Tray {i + 1}"
+
             try:
                 starting_weight = float(starting_weight)
                 if starting_weight <= 0:
-                    flash(f"Tray {i + 1}: Initial weight must be greater than 0.", "danger")
+                    flash(f"{label}: Initial weight must be greater than 0.", "danger")
                     error = True
             except (ValueError, TypeError):
-                flash(f"Tray {i + 1}: Initial weight must be a valid number.", "danger")
+                flash(f"{label}: Initial weight must be a valid number.", "danger")
                 error = True
 
             try:
                 tare_weight = float(tare_weight)
                 if starting_weight < tare_weight:
-                    flash(f"Tray {i + 1}: Initial weight must be greater than empty tray weight.", "danger")
+                    flash(f"{label}: Initial weight must be greater than empty tray weight.", "danger")
                     error = True
             except (ValueError, TypeError):
-                flash(f"Tray {i + 1}: Empty tray weight must be a valid number.", "danger")
+                flash(f"{label}: Empty tray weight must be a valid number.", "danger")
                 error = True
 
             # Append the entered data for each tray (preserving input even if invalid)
             trays.append(
                 {
+                    "name": name,
                     "contents": contents,
                     "starting_weight": (
                         starting_weight if isinstance(
@@ -275,6 +296,7 @@ def add_batch():
         # Add trays to the batch
         for i, tray_data in enumerate(trays):
             tray = Tray(
+                name=tray_data["name"] or None,
                 contents=tray_data["contents"],
                 starting_weight=tray_data["starting_weight"],
                 tare_weight=tray_data["tare_weight"],
@@ -313,13 +335,13 @@ def complete_batch(id):
         try:
             ending_weight = float(ending_weight)
             if ending_weight <= 0:
-                flash(f"Tray {tray.position}: Final weight must be greater than 0.", "danger")
+                flash(f"{tray.display_name}: Final weight must be greater than 0.", "danger")
                 return render_template("view_batch.html", batch=batch)
             elif ending_weight > tray.starting_weight:
-                flash(f"Tray {tray.position}: Final weight cannot exceed the initial weight.", "danger")
+                flash(f"{tray.display_name}: Final weight cannot exceed the initial weight.", "danger")
                 return render_template("view_batch.html", batch=batch)
         except (ValueError, TypeError):
-            flash(f"Tray {tray.position}: Final weight must be a valid number.", "danger")
+            flash(f"{tray.display_name}: Final weight must be a valid number.", "danger")
             return render_template("view_batch.html", batch=batch)
 
     # Update tray weights and mark batch as complete
@@ -522,6 +544,7 @@ def edit_tray(id):
             db.session.commit()
             return redirect(url_for("view_batch", id=batch_id))
         else:
+            tray.name = request.form.get("name", "").strip() or None
             tray.contents = request.form["contents"]
             tray.starting_weight = (
                 float(request.form["starting_weight"])
@@ -553,6 +576,7 @@ def add_tray(batch_id):
 
     if request.method == "POST":
         contents = request.form.get("contents", "")
+        name = request.form.get("name", "").strip()
         starting_weight = request.form.get("starting_weight", "")
         tare_weight = request.form.get("tare_weight", 0)
         notes = request.form.get("notes", "")
@@ -578,6 +602,7 @@ def add_tray(batch_id):
 
         if error:
             return render_template("add_tray.html", batch=batch,
+                                   name=name,
                                    contents=contents,
                                    starting_weight=starting_weight if isinstance(starting_weight, float) else "",
                                    tare_weight=tare_weight if isinstance(tare_weight, float) else 0,
@@ -585,6 +610,7 @@ def add_tray(batch_id):
 
         next_position = max((t.position for t in batch.trays), default=0) + 1
         tray = Tray(
+            name=name or None,
             contents=contents,
             starting_weight=starting_weight,
             tare_weight=tare_weight,
@@ -605,6 +631,7 @@ def add_tray(batch_id):
 
     last_tray = max(batch.trays, key=lambda t: t.position, default=None)
     return render_template("add_tray.html", batch=batch,
+                           name="",
                            contents=last_tray.contents if last_tray else "",
                            starting_weight="",
                            tare_weight=last_tray.tare_weight if last_tray else 0,
@@ -942,6 +969,7 @@ def create_backup_file(comment=""):
         tray_data = {
             "id": tray.id,
             "batch_id": tray.batch_id,
+            "name": tray.name,
             "contents": tray.contents,
             "starting_weight": tray.starting_weight,
             "ending_weight": tray.ending_weight,
@@ -1120,6 +1148,7 @@ def restore_backup(snapshot=None):
                 tray = Tray(
                     id=tray_data["id"],
                     batch_id=tray_data["batch_id"],
+                    name=tray_data.get("name"),
                     contents=tray_data["contents"],
                     starting_weight=tray_data["starting_weight"],
                     ending_weight=tray_data["ending_weight"],
@@ -1487,7 +1516,7 @@ def create_batch_pdf(batch=None, batches=[]):
 
             y = align_text(
                 doc,
-                f"Tray {tray.position}",
+                tray.display_name,
                 y=y,
                 margin=margin + 40,
                 font_name="Helvetica-Bold",
@@ -1824,6 +1853,13 @@ def update_schema():
                 conn.execute(db.text('ALTER TABLE tray ADD COLUMN tare_weight FLOAT'))
                 # Set default value of 0 for all existing trays
                 conn.execute(db.text('UPDATE tray SET tare_weight = 0'))
+                conn.commit()
+
+        # Check if name column exists in tray table
+        has_name = 'name' in [col['name'] for col in inspector.get_columns('tray')]
+        if not has_name:
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE tray ADD COLUMN name VARCHAR(50)'))
                 conn.commit()
 
         # Check if uploaded_at column exists in photo table

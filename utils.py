@@ -213,7 +213,7 @@ def get_database_context(question, client):
         if net_ending_weight:
             weight_info += f", finished at {net_ending_weight}g"
         context_texts.append(
-            f"Tray {t.id} at position {t.position} in batch {t.batch.id} contains {t.contents}, {weight_info}, Tray Notes: '{t.notes}'"
+            f"{t.display_name} (id {t.id}, position {t.position}) in batch {t.batch.id} contains {t.contents}, {weight_info}, Tray Notes: '{t.notes}'"
         )
 
     for bag in bags:

@@ -50,7 +50,7 @@
         <ul class="list-group">
             {% for tray in batch.trays %}
             <li class="list-group-item d-flex align-items-center">
-                <span class="me-2" style="white-space: nowrap;">Tray {{ tray.position }}:</span>
+                <span class="me-2" style="white-space: nowrap;">{{ tray.display_name }}:</span>
                 <textarea class="form-control mx-2" id="tray-{{ tray.id }}" name="tray-{{ tray.id }}"
                     rows="1">{{ tray.contents }}</textarea>
                 <div class="ms-auto d-flex align-items-center gap-2" style="white-space: nowrap;">

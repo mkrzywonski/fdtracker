@@ -96,8 +96,8 @@
 
                 {# Tray Card #}
                 <div class="card border border-primary mb-3">
-                    <div class="card-header mb-2 bg-primary text-white">Tray {{
-                        tray.position }}
+                    <div class="card-header mb-2 bg-primary text-white">{{
+                        tray.display_name }}
                     </div>
                     <div class="card-body">
                         <p class="card-text">
@@ -116,7 +116,7 @@
                             <div class="card border border-danger">
                                 <div class="card-body">
                                     <label class="form-label text-danger font-weight-bold">
-                                        Enter weight for tray {{ tray.position }} (g)
+                                        Enter weight for {{ tray.display_name }} (g)
                                     </label>
                                     <input type="text" step="0.01" name="ending_weight_{{ tray.id }}"
                                         class="form-control border-danger text-danger ending-weight numeric-input"
@@ -159,7 +159,7 @@
             {# Tray Card #}
             <div class="card border border-primary mb-3">
                 <div class="card-header bg-primary text-white mb-3">
-                    <div class="text-center">Tray {{ tray.position }}</div>
+                    <div class="text-center">{{ tray.display_name }}</div>
                 </div>
                 <div class="d-flex gap-2 w-100 mb-3">
                     <span class="mb-2"></span>

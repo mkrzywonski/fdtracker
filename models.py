@@ -35,12 +35,18 @@ class Tray(db.Model):
         index=True,
     )
     contents = db.Column(db.String(100), nullable=False, index=True)
+    name = db.Column(db.String(50))  # Optional display name, e.g. "Tray #6"
     starting_weight = db.Column(db.Float)
     ending_weight = db.Column(db.Float)
     previous_weight = db.Column(db.Float)
     tare_weight = db.Column(db.Float, default=0.0)
     notes = db.Column(db.Text, index=True)
-    position = db.Column(db.Integer, nullable=False)  # Tray position in the machine
+    position = db.Column(db.Integer, nullable=False)  # Internal index / ordering only
+
+    @property
+    def display_name(self):
+        """User-facing label: the optional name, else the position index."""
+        return self.name or f"Tray {self.position}"
 
     weight_history = db.relationship(
         "TrayWeightHistory",
