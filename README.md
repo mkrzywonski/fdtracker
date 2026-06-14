@@ -18,7 +18,9 @@ A web application for tracking freeze-dried food batches. This tool allows you t
     
 - **Tray Management**:
   - Add trays to batches with detailed information.
-  - Update tray weights to track progress.
+  - Add trays to an existing batch at any time.
+  - Optionally assign display names to trays for easier identification.
+  - Update tray weights to track progress, with full weight history tracking.
   - Edit or delete individual trays.
 
 - **Bag Management**:
@@ -43,10 +45,11 @@ A web application for tracking freeze-dried food batches. This tool allows you t
    - Create backup files on server without having to download them
    - Restore database snapshots from a previous point in time
 
-- ChatGPT Assistant
+- AI Assistant
    - Ask ChatGPT about freeze drying, or about items in your database
    - Have I run any batches that contain strawberries?
    - Are there any bags of tomatoes left that have not been cosumed?
+   - Text-to-speech playback of assistant responses
    - **Requires OpenAI API Key
 
 ## Technologies Used
